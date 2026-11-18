@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Grand Line Escape</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background-color: #0b132b; font-family: 'Inter', sans-serif;
+    }
+    .font-display { font-family: 'Fredoka', sans-serif; }
+    .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+    canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+    .home-backdrop {
+      background:
+        radial-gradient(ellipse at 16% 12%, rgba(251, 146, 60, .28), transparent 34%),
+        radial-gradient(ellipse at 86% 82%, rgba(34, 211, 238, .2), transparent 38%),
+        linear-gradient(135deg, #090d20 0%, #17113a 48%, #071a2b 100%);
+    }
+    .home-shell {
+      background: linear-gradient(145deg, rgba(22, 27, 57, .97), rgba(8, 15, 35, .97));
+      box-shadow: 0 30px 100px rgba(0, 0, 0, .55), 0 0 55px rgba(168, 85, 247, .12);
+    }
+    .level-choice {
+      border: 1px solid rgba(148, 163, 184, .3);
+      background: linear-gradient(145deg, rgba(30, 41, 72, .9), rgba(15, 23, 42, .95));
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .level-choice:hover { transform: translateY(-2px); border-color: rgba(103, 232, 249, .7); }
+    .level-choice.active { box-shadow: 0 0 24px rgba(34, 211, 238, .15); }
+    .keycap {
+      display: inline-block;
+      border: 1px solid rgba(148, 163, 184, .38);
+      border-bottom-width: 2px;
+      border-radius: .35rem;
+      background: rgba(15, 23, 42, .9);
+      padding: 0 .35rem;
+      color: #e2e8f0;
+      font: 700 10px 'JetBrains Mono', monospace;
+    }
+</style>
+</head>
+<body class="text-slate-100 antialiased">
+
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="serverWarningBanner" class="fixed inset-x-0 top-0 z-50 hidden bg-rose-600 px-4 py-2.5 text-center text-xs font-extrabold text-white shadow-xl">
+    ⚠️ Java Backend Not Connected! Run <code class="rounded bg-slate-950 px-1.5 py-0.5 font-mono-code">run.bat</code> (Windows) or <code class="rounded bg-slate-950 px-1.5 py-0.5 font-mono-code">./run.sh</code> (Mac/Linux), then open <code class="underline">http://localhost:8080</code>.
+  </div>
+
+  <div id="hudLayer" class="pointer-events-none fixed inset-0 z-10 hidden flex flex-col justify-between p-3 sm:p-4">
+
+    <div class="flex flex-wrap items-start justify-between gap-2">
+
+      <div class="pointer-events-auto flex items-center gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/90 px-3.5 py-2.5 shadow-xl backdrop-blur-md">
+        <div class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-red-600 p-0.5 shadow-md">
+          <div class="flex h-full w-full items-center justify-center rounded-[10px] bg-slate-900 text-2xl">👒</div>
+          <span class="absolute -bottom-1 -right-1 rounded-md bg-amber-400 px-1.5 py-0.2 text-[10px] font-extrabold text-slate-950">JAVA</span>
+        </div>
+
+        <div class="flex flex-col gap-1.5 min-w-[165px] sm:min-w-[195px]">
+          <div>
+            <div class="mb-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide">
+              <span class="text-rose-400">❤️ HEALTH</span>
+              <span id="hudHpText" class="font-mono-code text-slate-200">100 / 100</span>
+            </div>
+            <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-800 p-0.5 ring-1 ring-slate-700">
+              <div id="hudHpBar" class="h-full rounded-full bg-gradient-to-r from-rose-500 to-emerald-400 transition-all duration-100" style="width: 100%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="mb-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide">
+              <span class="text-cyan-400">⚡ ENERGY (DASH)</span>
+              <span id="hudEnergyText" class="font-mono-code text-slate-200">100 / 100</span>
+            </div>
+            <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-800 p-0.5 ring-1 ring-slate-700">
+              <div id="hudEnergyBar" class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-400 transition-all duration-100" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="h-10 w-px bg-slate-700/80"></div>
+
+        <div class="flex flex-col items-center justify-center px-1">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300/80">Berries</span>
+          <div class="flex items-center gap-1 font-display text-xl font-bold text-amber-400">
+            <span>฿</span>
+            <span id="hudBerriesText">10</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-center gap-1.5">
+        <div class="pointer-events-auto flex items-center gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/90 px-4 py-2 shadow-xl backdrop-blur-md">
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm">⏱️</span>
+            <span id="hudTimerText" class="font-mono-code text-base font-bold text-white">00:00.0</span>
+          </div>
+          <div class="h-5 w-px bg-slate-700"></div>
+          <div class="flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1 ring-1 ring-emerald-500/40">
+            <span class="text-sm">🧭</span>
+            <span class="text-xs font-bold text-emerald-300">LOG POSES:</span>
+            <span id="hudGreenKeysText" class="font-mono-code text-sm font-extrabold text-emerald-400">0</span>
+          </div>
+          <div class="flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-2.5 py-1 ring-1 ring-amber-500/40">
+            <span class="text-sm">🔑</span>
+            <span class="text-xs font-bold text-amber-300">GOLD KEYS:</span>
+            <span id="hudGoldKeysText" class="font-mono-code text-sm font-extrabold text-amber-400">0/3</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 rounded-full border border-slate-700/70 bg-slate-950/85 px-3.5 py-1 text-xs font-semibold shadow-md backdrop-blur-sm">
+          <span id="hudZoneBadge" class="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-300">ZONE 0 - SAFE HARBOR</span>
+          <span id="hudBackendTag" class="font-mono-code text-[11px] text-emerald-400">● Java 60Hz Sync</span>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-end gap-2">
+        <div class="pointer-events-auto flex items-center gap-1.5">
+          <button id="btnToggleHitboxes" class="rounded-xl border border-slate-700 bg-slate-900/90 px-2.5 py-1.5 text-xs font-bold text-slate-300 shadow-lg transition hover:border-emerald-400 hover:text-emerald-300">
+            🎯 Hitboxes [H]
+          </button>
+          <button id="btnOpenRubricModal" class="rounded-xl border border-amber-500/60 bg-amber-500/20 px-3 py-1.5 text-xs font-extrabold text-amber-300 shadow-lg transition hover:bg-amber-500/35">
+            ☕ AP CSA Rubric Stats
+          </button>
+        </div>
+
+        <div class="pointer-events-auto relative overflow-hidden rounded-2xl border-2 border-slate-700/90 bg-slate-950/90 shadow-2xl">
+          <canvas id="minimapCanvas" width="168" height="122" class="block cursor-default"></canvas>
+          <div class="pointer-events-none absolute bottom-1 left-2 text-[9px] font-bold uppercase tracking-wider text-slate-300/80">
+            Grand Line Radar
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="bossHudBar" class="mx-auto hidden w-full max-w-xl rounded-2xl border-2 border-rose-500/70 bg-slate-950/90 px-4 py-2.5 shadow-2xl backdrop-blur-md">
+      <div class="mb-1 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">👑</span>
+          <span class="font-display text-sm font-bold tracking-wider text-rose-400">IMU — SOVEREIGN OF THE EMPTY THRONE</span>
+        </div>
+        <span id="bossHpText" class="font-mono-code text-xs font-bold text-rose-200">2400 / 2400</span>
+      </div>
+      <div class="h-3.5 w-full overflow-hidden rounded-full bg-slate-900 p-0.5 ring-1 ring-rose-500/50">
+        <div id="bossHpFill" class="h-full rounded-full bg-gradient-to-r from-purple-600 via-rose-600 to-amber-400 transition-all duration-100" style="width: 100%"></div>
+      </div>
+    </div>
+
+    <div class="flex flex-col items-center gap-2">
+      <div id="interactPrompt" class="pointer-events-auto hidden items-center gap-2 rounded-full border border-amber-400/80 bg-slate-900/95 px-4 py-1.5 text-xs font-extrabold text-amber-300 shadow-xl">
+        <span class="rounded bg-amber-400 px-1.5 py-0.5 font-mono-code text-[11px] text-slate-950">E</span>
+        <span id="interactPromptText">Interact</span>
+      </div>
+
+      <div id="weaponHotbar" class="pointer-events-auto flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-slate-700/80 bg-slate-900/90 p-1.5 shadow-2xl backdrop-blur-md"></div>
+    </div>
+  </div>
+
+  <div id="startScreen" class="home-backdrop fixed inset-0 z-30 flex items-center justify-center overflow-y-auto p-3 sm:p-6">
+    <div class="home-shell relative my-auto grid max-h-[96vh] w-full max-w-6xl grid-cols-1 overflow-y-auto rounded-[2rem] border border-cyan-200/20 shadow-2xl md:grid-cols-[1.05fr_.95fr]">
+      <section class="relative overflow-hidden p-6 sm:p-9 lg:p-11">
+        <div class="absolute -right-20 -top-20 h-64 w-64 rounded-full border border-amber-300/10"></div>
+        <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full border border-cyan-300/15"></div>
+        <div class="relative">
+          <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[.2em] text-amber-200">
+            <span class="h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_12px_#fcd34d]"></span>
+            Island raid · Action adventure
+          </div>
+          <h1 class="font-display text-5xl font-extrabold leading-[.98] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            GRAND LINE
+            <span class="mt-2 block bg-gradient-to-r from-amber-200 via-orange-400 to-rose-400 bg-clip-text text-transparent">ESCAPE</span>
+          </h1>
+          <p class="mt-5 max-w-lg text-sm leading-6 text-slate-300 sm:text-base">
+            Break through guarded island sectors, gather Log Poses, and reach the Empty Throne. Pirates are your main source of berries—fight smart, then spend carefully.
+          </p>
+
+          <div class="mt-7 grid grid-cols-3 gap-2">
+            <div class="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.06] p-3">
+              <span class="block text-lg">⚔️</span>
+              <span class="mt-1 block text-[10px] font-bold uppercase tracking-wider text-cyan-200">Fight</span>
+            </div>
+            <div class="rounded-2xl border border-emerald-300/15 bg-emerald-300/[.06] p-3">
+              <span class="block text-lg">🧭</span>
+              <span class="mt-1 block text-[10px] font-bold uppercase tracking-wider text-emerald-200">Explore</span>
+            </div>
+            <div class="rounded-2xl border border-rose-300/15 bg-rose-300/[.06] p-3">
+              <span class="block text-lg">👑</span>
+              <span class="mt-1 block text-[10px] font-bold uppercase tracking-wider text-rose-200">Escape</span>
+            </div>
+          </div>
+
+          <div class="mt-7 rounded-2xl border border-slate-600/50 bg-slate-950/45 p-4 sm:p-5">
+            <div class="mb-3 flex items-center justify-between">
+              <h2 class="font-display text-lg font-bold text-white">FIELD GUIDE</h2>
+              <span class="text-[10px] font-bold uppercase tracking-[.15em] text-slate-500">Quick start</span>
+            </div>
+            <div class="grid gap-3 text-xs leading-5 text-slate-300 sm:grid-cols-2">
+              <p><kbd class="keycap">W A S D</kbd> or arrows to move; point and <kbd class="keycap">Click</kbd> to attack.</p>
+              <p><kbd class="keycap">E</kbd> near chests, gates, stations, and portals to interact.</p>
+              <p><kbd class="keycap">Space</kbd> or <kbd class="keycap">Shift</kbd> to dash; <kbd class="keycap">R</kbd> reloads.</p>
+              <p>Defeat pirates for berries and keys. Chests are rare and return after 40 seconds.</p>
+            </div>
+            <p class="mt-3 border-t border-slate-700/70 pt-3 text-[11px] leading-5 text-amber-100/80">Start with 0 berries: pirates drop 8–34+ each, while chests give only 1–12. Pirates return 2 seconds after defeat. Use the Armory and Forge with <kbd class="keycap">E</kbd>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="border-t border-cyan-100/10 bg-slate-950/35 p-6 sm:p-9 md:border-l md:border-t-0 lg:p-11">
+        <div class="mb-6 flex items-end justify-between gap-3">
+          <div>
+            <p class="text-[10px] font-extrabold uppercase tracking-[.22em] text-cyan-300">Choose your challenge</p>
+            <h2 class="mt-1 font-display text-3xl font-bold text-white">Set your course</h2>
+          </div>
+          <span class="rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-1 text-[10px] font-bold text-rose-200">5 LEVELS</span>
+        </div>
+
+        <div class="mb-5">
+          <label for="inputCallsign" class="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Captain name</label>
+          <input id="inputCallsign" type="text" value="Monkey D. Luffy" maxlength="28"
+                 class="w-full rounded-xl border border-slate-600/80 bg-slate-900 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/20" />
+        </div>
+
+        <div class="mb-3 flex min-h-10 items-center justify-between gap-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Difficulty</span>
+          <span id="difficultyDescText" class="text-right text-xs font-semibold text-cyan-200">Balanced — 5 Log Poses per gate</span>
+        </div>
+        <div id="difficultyGrid" class="grid grid-cols-2 gap-2 sm:grid-cols-3"></div>
+
+        <button id="btnStartGame" class="mt-6 w-full rounded-xl bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 px-5 py-3.5 font-display text-lg font-extrabold tracking-wide text-slate-950 shadow-[0_10px_35px_rgba(251,146,60,.2)] transition hover:-translate-y-0.5 hover:brightness-110">
+          BEGIN THE RAID <span class="ml-1">→</span>
+        </button>
+        <p class="mt-3 text-center text-[10px] text-slate-500">Pick up treasure only when you choose to stop and interact.</p>
+      </section>
+    </div>
+  </div>
+
+  <div id="armoryModal" class="fixed inset-0 z-30 hidden items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
+    <div class="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-3xl border-2 border-cyan-500/60 bg-slate-900 p-6 shadow-2xl">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-extrabold uppercase tracking-wider text-cyan-400">Safe Harbor Vending Station</span>
+          <h2 class="font-display text-2xl font-bold text-white">⚔️ GRAND LINE ARMORY</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="rounded-xl bg-amber-500/20 px-3 py-1.5 font-display text-base font-bold text-amber-300">
+            ฿ <span id="armoryBerriesDisplay">0</span>
+          </div>
+          <button id="btnCloseArmory" class="rounded-xl bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300 hover:bg-slate-700">✕</button>
+        </div>
+      </div>
+      <div id="armoryItemsGrid" class="grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
+    </div>
+  </div>
+
+  <div id="forgeModal" class="fixed inset-0 z-30 hidden items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
+    <div class="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-3xl border-2 border-purple-500/60 bg-slate-900 p-6 shadow-2xl">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-extrabold uppercase tracking-wider text-purple-400">Haki &amp; Wapometal Upgrader</span>
+          <h2 class="font-display text-2xl font-bold text-white">🔨 RARITY FORGE</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="rounded-xl bg-amber-500/20 px-3 py-1.5 font-display text-base font-bold text-amber-300">
+            ฿ <span id="forgeBerriesDisplay">0</span>
+          </div>
+          <button id="btnCloseForge" class="rounded-xl bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300 hover:bg-slate-700">✕</button>
+        </div>
+      </div>
+      <div id="forgeItemsGrid" class="grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
+    </div>
+  </div>
+
+  <div id="rubricModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
+    <div class="w-full max-w-2xl rounded-3xl border-2 border-amber-500/70 bg-slate-900 p-6 shadow-2xl">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-extrabold uppercase tracking-wider text-amber-400">Live Java Backend State &amp; Trackers</span>
+          <h2 class="font-display text-2xl font-bold text-white">☕ AP CSA UNITS 1 &amp; 2 RUBRIC TELEMETRY</h2>
+        </div>
+        <button id="btnCloseRubric" class="rounded-xl bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300 hover:bg-slate-700">✕</button>
+      </div>
+      <div id="rubricStatsBody" class="space-y-3 text-xs text-slate-300"></div>
+    </div>
+  </div>
+
+  <div id="endModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950 p-4">
+    <div class="w-full max-w-md space-y-4 rounded-lg border border-slate-700 bg-slate-900 p-6">
+      <div>
+        <h2 id="endTitle" class="text-2xl font-bold text-white">Run complete</h2>
+        <p id="endSubtitle" class="mt-1 text-sm text-slate-400">View your results or choose another level.</p>
+      </div>
+      <dl class="grid grid-cols-2 gap-3 text-sm">
+        <div><dt class="text-slate-400">Time</dt><dd id="statFinalTime" class="font-semibold text-white">00:00.0</dd></div>
+        <div><dt class="text-slate-400">Level</dt><dd id="statDifficulty" class="font-semibold text-white">Normal</dd></div>
+        <div><dt class="text-slate-400">Pirates defeated</dt><dd id="statKills" class="font-semibold text-white">0</dd></div>
+        <div><dt class="text-slate-400">Chests opened</dt><dd id="statChests" class="font-semibold text-white">0</dd></div>
+      </dl>
+      <button id="btnPlayAgain" class="w-full rounded bg-cyan-500 px-4 py-2.5 font-semibold text-slate-950 hover:bg-cyan-400">
+        Choose another level
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const DIFFICULTIES = [
+        { name: 'Easy',      color: '#34d399', desc: 'Light resistance — 4 Log Poses per gate' },
+        { name: 'Normal',    color: '#22d3ee', desc: 'Balanced — 5 Log Poses per gate' },
+        { name: 'Hard',      color: '#a78bfa', desc: 'Tougher pirates — 6 Log Poses per gate' },
+        { name: 'Expert',    color: '#fb923c', desc: 'High intensity — 7 Log Poses per gate' },
+        { name: 'Ludicrous', color: '#fb7185', desc: 'Extreme danger — 8 Log Poses per gate' }
+      ];
+
+      const RARITIES = [
+        { name: 'Common',    color: '#94a3b8', glow: 'rgba(148, 163, 184, 0.45)' },
+        { name: 'Uncommon',  color: '#22c55e', glow: 'rgba(34, 197, 94, 0.50)' },
+        { name: 'Rare',      color: '#3b82f6', glow: 'rgba(59, 130, 246, 0.55)' },
+        { name: 'Epic',      color: '#a855f7', glow: 'rgba(168, 85, 247, 0.60)' },
+        { name: 'Legendary', color: '#eab308', glow: 'rgba(234, 179, 8, 0.70)' }
+      ];
+
+      const STATIONS = [
+        { id: 'sunny_ship',      type: 'SHIP',          name: 'Thousand Sunny (Escape Ship)',       x: 375,  y: 1300, radius: 58, color: '#f59e0b' },
+        { id: 'armory_station',  type: 'ARMORY',        name: 'Armory Vending Machine',             x: 640,  y: 1050, radius: 36, color: '#38bdf8' },
+        { id: 'forge_station',   type: 'FORGE',         name: 'Rarity Forge Station',               x: 640,  y: 1550, radius: 36, color: '#a855f7' },
+        { id: 'warp_harbor',     type: 'WARP_OUT',      name: 'Fast-Travel Pad (To Jungle)',        x: 760,  y: 1300, radius: 30, color: '#22d3ee' },
+        { id: 'warp_jungle',     type: 'WARP_HOME',     name: 'Fast-Travel Pad (To Safe Harbor)',   x: 1860, y: 1120, radius: 30, color: '#22d3ee' },
+        { id: 'warp_volcano',    type: 'WARP_HOME',     name: 'Fast-Travel Pad (To Safe Harbor)',   x: 2810, y: 1120, radius: 30, color: '#22d3ee' },
+        { id: 'secret_pedestal', type: 'SECRET_WEAPON', name: "Conqueror's Haki Rod Pedestal",      x: 2220, y: 540,  radius: 32, color: '#eab308' },
+        { id: 'throne_portal',   type: 'THRONE_PORTAL', name: 'Empty Throne Portal (Final Boss)',   x: 3320, y: 1300, radius: 44, color: '#e11d48' },
+        { id: 'victory_portal',  type: 'VICTORY_WARP',  name: 'Warp to Thousand Sunny',             x: 1800, y: 3480, radius: 40, color: '#fbbf24' }
+      ];
+
+      const PALM_TREES = [
+        [920, 620, 1.0], [1120, 580, 1.1], [1380, 640, 0.95], [1600, 580, 1.05],
+        [940, 1960, 1.0], [1220, 1980, 1.15], [1540, 1940, 0.92], [1880, 650, 1.05],
+        [1940, 1920, 1.0], [2250, 1960, 1.1], [2540, 640, 0.95], [2560, 1920, 1.05]
+      ];
+
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const miniCanvas = document.getElementById('minimapCanvas');
+      const miniCtx = miniCanvas.getContext('2d');
+
+      let viewportW = window.innerWidth;
+      let viewportH = window.innerHeight;
+      function resizeCanvas() {
+        viewportW = window.innerWidth;
+        viewportH = window.innerHeight;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(viewportW * dpr);
+        canvas.height = Math.floor(viewportH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      let selectedDiffIdx = 1;
+      let serverSnap = null;
+      let activeModal = null;
+      let endShown = false;
+      let camX = 0, camY = 0;
+      const keys = {};
+      const mouse = { x: viewportW / 2, y: viewportH / 2, down: false };
+      const floatingTexts = [];
+      const seenEventIds = new Set();
+
+      async function pollJavaState() {
+        try {
+          const res = await fetch('/api/state');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          document.getElementById('serverWarningBanner').classList.add('hidden');
+          serverSnap = data;
+          ingestServerEvents(data.events || []);
+          syncHudFromJava(data);
+        } catch (err) {
+          document.getElementById('serverWarningBanner').classList.remove('hidden');
+        }
+      }
+
+      async function sendInputToJava() {
+        if (!serverSnap || serverSnap.mode !== 'PLAYING' || activeModal) return;
+        const p = serverSnap.player;
+        const aimAngle = Math.atan2((mouse.y + camY) - p.y, (mouse.x + camX) - p.x);
+        const payload = {
+          up: !!(keys['KeyW'] || keys['ArrowUp']),
+          down: !!(keys['KeyS'] || keys['ArrowDown']),
+          left: !!(keys['KeyA'] || keys['ArrowLeft']),
+          right: !!(keys['KeyD'] || keys['ArrowRight']),
+          firing: !!mouse.down,
+          aimAngle: Number(aimAngle.toFixed(3))
+        };
+        try {
+          await fetch('/api/input', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } catch (e) {}
+      }
+
+      async function sendActionToJava(action, param = 0) {
+        try {
+          const res = await fetch('/api/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, param })
+          });
+          return await res.json();
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function ingestServerEvents(events) {
+        for (const ev of events) {
+          if (!seenEventIds.has(ev.id)) {
+            seenEventIds.add(ev.id);
+            floatingTexts.push({
+              x: ev.x,
+              y: ev.y,
+              text: ev.text,
+              color: ev.color,
+              life: 1.15
+            });
+          }
+        }
+      }
+
+      function formatTime(sec) {
+        const mins = Math.floor(sec / 60);
+        const rem = sec % 60;
+        return `${String(mins).padStart(2, '0')}:${rem.toFixed(1).padStart(4, '0')}`;
+      }
+
+      function syncHudFromJava(data) {
+        const p = data.player;
+        document.getElementById('hudHpText').textContent = `${p.hp} / ${p.maxHp}`;
+        document.getElementById('hudHpBar').style.width = `${Math.min(100, (p.hp / p.maxHp) * 100)}%`;
+        document.getElementById('hudEnergyText').textContent = `${p.energy} / ${p.maxEnergy}`;
+        document.getElementById('hudEnergyBar').style.width = `${Math.min(100, (p.energy / p.maxEnergy) * 100)}%`;
+        document.getElementById('hudBerriesText').textContent = p.berries;
+        document.getElementById('hudTimerText').textContent = formatTime(data.elapsedTime);
+        document.getElementById('hudGreenKeysText').textContent = p.greenKeys;
+        document.getElementById('hudGoldKeysText').textContent = `${p.goldKeys}/3`;
+        document.getElementById('hudZoneBadge').textContent = data.zoneLabel;
+
+        const imu = (data.enemies || []).find(e => e.boss && e.hp > 0);
+        const bossBar = document.getElementById('bossHudBar');
+        if (p.y > 2500 && imu) {
+          bossBar.classList.remove('hidden');
+          document.getElementById('bossHpText').textContent = `${imu.hp} / ${imu.maxHp}`;
+          document.getElementById('bossHpFill').style.width = `${Math.max(0, (imu.hp / imu.maxHp) * 100)}%`;
+        } else {
+          bossBar.classList.add('hidden');
+        }
+
+        updatePrompt(data);
+
+        renderHotbar(p);
+
+        if ((data.mode === 'VICTORY' || data.mode === 'DEFEAT') && !endShown) {
+          endShown = true;
+          const win = data.mode === 'VICTORY';
+          document.getElementById('endTitle').textContent = win ? 'Escaped!' : 'Defeated';
+          document.getElementById('endSubtitle').textContent = win
+            ? 'You completed the run.'
+            : 'Your health reached zero.';
+          document.getElementById('statFinalTime').textContent = formatTime(data.elapsedTime);
+          document.getElementById('statDifficulty').textContent = data.difficulty;
+          document.getElementById('statKills').textContent = data.metrics.kills;
+          document.getElementById('statChests').textContent = data.metrics.chestsOpened;
+          const m = document.getElementById('endModal');
+          m.classList.remove('hidden');
+          m.classList.add('flex');
+        }
+      }
+
+      function updatePrompt(data) {
+        const p = data.player;
+        const promptEl = document.getElementById('interactPrompt');
+        const textEl = document.getElementById('interactPromptText');
+
+        for (const st of STATIONS) {
+          if (st.type === 'VICTORY_WARP' && !data.imuDefeated) continue;
+          if (st.type === 'SECRET_WEAPON' && data.secretWeaponClaimed) continue;
+          if (Math.hypot(p.x - st.x, p.y - st.y) <= st.radius + 46) {
+            promptEl.classList.remove('hidden');
+            promptEl.classList.add('flex');
+            textEl.textContent = st.name;
+            return;
+          }
+        }
+        for (const chest of (data.chests || [])) {
+          if (!chest.opened && Math.hypot(p.x - chest.x, p.y - chest.y) <= 58) {
+            promptEl.classList.remove('hidden');
+            promptEl.classList.add('flex');
+            textEl.textContent = 'Open treasure chest';
+            return;
+          }
+        }
+        for (const g of (data.gates || [])) {
+          if (g.opened) continue;
+          if (Math.hypot(p.x - (g.x + g.w / 2), p.y - (g.y + g.h / 2)) <= 125) {
+            promptEl.classList.remove('hidden');
+            promptEl.classList.add('flex');
+            textEl.textContent = `Unlock ${g.name}`;
+            return;
+          }
+        }
+        promptEl.classList.add('hidden');
+        promptEl.classList.remove('flex');
+      }
+
+      function renderHotbar(p) {
+        const hotbar = document.getElementById('weaponHotbar');
+        hotbar.innerHTML = '';
+        p.weapons.forEach((w, idx) => {
+          const sel = idx === p.equippedIndex;
+          const btn = document.createElement('button');
+          btn.className = `flex min-w-[96px] sm:min-w-[118px] flex-col items-start rounded-xl border-2 px-2.5 py-1.5 text-left transition ${
+            !w.unlocked ? 'border-slate-800 bg-slate-950/60 opacity-45' : sel ? 'scale-105 bg-slate-800 shadow-lg' : 'border-slate-700 bg-slate-900/90'
+          }`;
+          if (w.unlocked) btn.style.borderColor = sel ? w.rarityColor : `${w.rarityColor}66`;
+          btn.innerHTML = `
+            <div class="flex w-full items-center justify-between text-[10px] font-extrabold">
+              <span class="rounded bg-slate-950 px-1.5 font-mono-code text-slate-300">${idx + 1}</span>
+              <span style="color:${w.rarityColor}">${w.unlocked ? w.rarityName.toUpperCase() : 'LOCKED'}</span>
+            </div>
+            <div class="mt-0.5 flex items-center gap-1.5">
+              <span>${w.icon}</span>
+              <span class="truncate text-xs font-bold text-white">${w.name.split(' ')[0]}</span>
+            </div>
+            <div class="mt-0.5 font-mono-code text-[10px] text-slate-300">
+              ${!w.unlocked ? (w.cost < 0 ? 'Secret Vault' : `฿${w.cost} Armory`) : w.reloading ? 'Reloading...' : `${w.ammo} / ${w.clipSize}`}
+            </div>
+          `;
+          btn.onclick = () => sendActionToJava('SELECT_SLOT', idx);
+          hotbar.appendChild(btn);
+        });
+      }
+
+      function openArmory() {
+        if (!serverSnap) return;
+        activeModal = 'ARMORY';
+        const m = document.getElementById('armoryModal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        const p = serverSnap.player;
+        document.getElementById('armoryBerriesDisplay').textContent = p.berries;
+        const grid = document.getElementById('armoryItemsGrid');
+        grid.innerHTML = '';
+        p.weapons.forEach((w, idx) => {
+          if (w.cost < 0 && !w.unlocked) return;
+          const canAfford = p.berries >= w.cost;
+          const card = document.createElement('div');
+          card.className = 'flex flex-col justify-between rounded-2xl border border-slate-700 bg-slate-950/90 p-4';
+          card.innerHTML = `
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-2xl">${w.icon}</span>
+                <span class="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-cyan-300">${w.gimkitRef}</span>
+              </div>
+              <h4 class="mt-1 font-display text-base font-bold text-white">${w.name}</h4>
+              <p class="mt-1 text-xs text-slate-400">${w.desc}</p>
+            </div>
+            <div class="mt-3">
+              ${w.unlocked
+                ? `<div class="w-full rounded-xl bg-emerald-500/20 py-2 text-center text-xs font-extrabold text-emerald-300">✓ OWNED</div>`
+                : `<button data-idx="${idx}" class="w-full rounded-xl py-2 text-xs font-extrabold ${canAfford ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-500'}">BUY FOR ฿${w.cost}</button>`}
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+        grid.querySelectorAll('button[data-idx]').forEach(b => {
+          b.onclick = async () => {
+            await sendActionToJava('BUY_WEAPON', Number(b.dataset.idx));
+            await pollJavaState();
+            openArmory();
+          };
+        });
+      }
+
+      function openForge() {
+        if (!serverSnap) return;
+        activeModal = 'FORGE';
+        const m = document.getElementById('forgeModal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        const p = serverSnap.player;
+        document.getElementById('forgeBerriesDisplay').textContent = p.berries;
+        const grid = document.getElementById('forgeItemsGrid');
+        grid.innerHTML = '';
+        p.weapons.forEach((w, idx) => {
+          if (!w.unlocked) return;
+          const canAfford = !w.maxRarity && p.berries >= w.upgradeCost;
+          const card = document.createElement('div');
+          card.className = 'flex flex-col justify-between rounded-2xl border-2 bg-slate-950/90 p-4';
+          card.style.borderColor = w.rarityColor;
+          card.innerHTML = `
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-2xl">${w.icon}</span>
+                <span class="rounded px-2 py-0.5 text-[11px] font-extrabold text-slate-950" style="background:${w.rarityColor}">${w.rarityName.toUpperCase()}</span>
+              </div>
+              <h4 class="mt-1 font-display text-base font-bold text-white">${w.name}</h4>
+              <div class="mt-2 font-mono-code text-xs text-slate-300">Current Damage: <strong class="text-white">${w.damage}</strong></div>
+            </div>
+            <div class="mt-3">
+              ${w.maxRarity
+                ? `<div class="w-full rounded-xl bg-amber-500/20 py-2 text-center text-xs font-extrabold text-amber-300">★ MAX LEGENDARY ★</div>`
+                : `<button data-idx="${idx}" class="w-full rounded-xl py-2 text-xs font-extrabold ${canAfford ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-500'}">UPGRADE RARITY (฿${w.upgradeCost})</button>`}
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+        grid.querySelectorAll('button[data-idx]').forEach(b => {
+          b.onclick = async () => {
+            await sendActionToJava('UPGRADE_WEAPON', Number(b.dataset.idx));
+            await pollJavaState();
+            openForge();
+          };
+        });
+      }
+
+      function openRubricModal() {
+        if (!serverSnap) return;
+        activeModal = 'RUBRIC';
+        const m = document.getElementById('rubricModal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        const p = serverSnap.player;
+        const met = serverSnap.metrics;
+        document.getElementById('rubricStatsBody').innerHTML = `
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div class="text-[10px] font-bold uppercase text-slate-400">Formatted Captain Callsign (String methods)</div>
+              <div class="mt-1 font-mono-code text-sm font-bold text-amber-300">${p.callsign}</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div class="text-[10px] font-bold uppercase text-slate-400">Parsed Active Zone (indexOf &amp; substring)</div>
+              <div class="mt-1 font-mono-code text-sm font-bold text-cyan-300">${serverSnap.zoneLabel}</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div class="text-[10px] font-bold uppercase text-slate-400">Min Tracker: Lowest HP Reached</div>
+              <div class="mt-1 font-mono-code text-sm font-bold text-rose-400">${met.lowestHpReached} HP</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div class="text-[10px] font-bold uppercase text-slate-400">Max Tracker: Highest Single Hit</div>
+              <div class="mt-1 font-mono-code text-sm font-bold text-emerald-400">${met.highestSingleHit} DMG</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div class="text-[10px] font-bold uppercase text-slate-400">Counter: Chests Opened / Pirates Defeated</div>
+              <div class="mt-1 font-mono-code text-sm font-bold text-white">${met.chestsOpened} Chests  |  ${met.kills} Kills</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div class="text-[10px] font-bold uppercase text-slate-400">Accumulator: Total Berries Earned</div>
+              <div class="mt-1 font-mono-code text-sm font-bold text-amber-400">฿${met.totalBerriesEarned}</div>
+            </div>
+          </div>
+          <div class="rounded-xl border border-slate-800 bg-slate-950 p-3 leading-relaxed">
+            <strong class="text-emerald-400">12-Class Java Backend Architecture:</strong>
+            <code>Main</code>, <code>GameServer</code>, <code>GameEngine</code>, <code>Player</code>, <code>Weapon</code>, <code>PirateEnemy</code>, <code>RarityChest</code>, <code>SectorGate</code>, <code>WorldObstacle</code>, <code>Projectile</code>, <code>SkyLaser</code>, <code>BoundaryTestSuite</code>.
+          </div>
+        `;
+      }
+
+      function closeModals() {
+        activeModal = null;
+        ['armoryModal', 'forgeModal', 'rubricModal'].forEach(id => {
+          const el = document.getElementById(id);
+          el.classList.add('hidden');
+          el.classList.remove('flex');
+        });
+      }
+
+      function render(nowSec) {
+        ctx.clearRect(0, 0, viewportW, viewportH);
+        if (!serverSnap) return;
+
+        const p = serverSnap.player;
+        camX += (p.x - viewportW / 2 - camX) * 0.22;
+        camY += (p.y - viewportH / 2 - camY) * 0.22;
+
+        ctx.save();
+        ctx.translate(-camX, -camY);
+
+        drawTerrain(p, nowSec);
+        drawStations(nowSec);
+        drawWallsAndGates();
+        drawChests(nowSec);
+        drawEnemies();
+        drawLuffy(p);
+        drawProjectilesAndLasers();
+        drawPalmTrees(p);
+        drawFloatingTexts();
+
+        if (serverSnap.showHitboxes) {
+          drawHitboxes(p);
+        }
+        ctx.restore();
+
+        renderMinimap(p);
+      }
+
+      function drawTerrain(p, nowSec) {
+        if (p.y > 2500) {
+          ctx.fillStyle = '#090d16';
+          ctx.fillRect(900, 2400, 1800, 1500);
+          ctx.fillStyle = '#1e1b4b';
+          ctx.beginPath(); ctx.roundRect(1200, 2700, 1200, 952, 24); ctx.fill();
+          ctx.fillStyle = '#7f1d1d';
+          ctx.fillRect(1710, 2740, 180, 870);
+          ctx.strokeStyle = '#eab308'; ctx.lineWidth = 4;
+          ctx.strokeRect(1714, 2744, 172, 862);
+          ctx.fillStyle = '#ca8a04';
+          ctx.beginPath(); ctx.roundRect(1720, 2755, 160, 75, 12); ctx.fill();
+          return;
+        }
+
+        ctx.fillStyle = '#0284c7';
+        ctx.fillRect(0, 400, 3800, 1850);
+
+        ctx.strokeStyle = 'rgba(125, 211, 252, 0.25)';
+        ctx.lineWidth = 3;
+        const shift = Math.sin(nowSec * 1.5) * 18;
+        for (let wy = 440; wy < 2200; wy += 95) {
+          ctx.beginPath(); ctx.moveTo(140 + shift, wy); ctx.lineTo(3620 - shift, wy); ctx.stroke();
+        }
+
+        ctx.fillStyle = 'rgba(224, 242, 254, 0.55)';
+        ctx.beginPath(); ctx.roundRect(276, 436, 3228, 1728, 110); ctx.fill();
+
+        ctx.fillStyle = '#fde08d';
+        ctx.beginPath(); ctx.roundRect(300, 460, 1480, 1680, 96); ctx.fill();
+
+        ctx.fillStyle = '#92400e';
+        ctx.beginPath(); ctx.roundRect(310, 1000, 480, 600, 18); ctx.fill();
+
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(1758, 460, 952, 1680);
+
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(2075, 465, 290, 195);
+
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath(); ctx.roundRect(2708, 460, 772, 1680, [0, 96, 96, 0]); ctx.fill();
+      }
+
+      function drawStations(nowSec) {
+        for (const st of STATIONS) {
+          if (st.type === 'VICTORY_WARP' && !serverSnap.imuDefeated) continue;
+          const pulse = 1 + Math.sin(nowSec * 4) * 0.08;
+          ctx.beginPath();
+          ctx.arc(st.x, st.y, st.radius * pulse, 0, Math.PI * 2);
+          ctx.fillStyle = st.color + '33';
+          ctx.fill();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = st.color;
+          ctx.stroke();
+
+          if (st.type === 'SHIP') {
+            ctx.fillStyle = '#b45309';
+            ctx.beginPath(); ctx.ellipse(st.x, st.y, 46, 76, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath(); ctx.arc(st.x, st.y - 54, 18, 0, Math.PI * 2); ctx.fill();
+          }
+
+          ctx.font = '700 11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(st.name, st.x, st.y - st.radius - 10);
+        }
+      }
+
+      function drawWallsAndGates() {
+        for (const w of (serverSnap.walls || [])) {
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.32)';
+          ctx.beginPath(); ctx.roundRect(w.x + 12, w.y + 14, w.w, w.h, 8); ctx.fill();
+
+          ctx.fillStyle = w.type === 'crate' ? '#b45309' : w.type === 'obsidian' ? '#0f172a' : '#475569';
+          ctx.beginPath(); ctx.roundRect(w.x, w.y, w.w, w.h, 8); ctx.fill();
+        }
+
+        for (const g of (serverSnap.gates || [])) {
+          if (g.opened) continue;
+          ctx.fillStyle = g.color;
+          ctx.beginPath(); ctx.roundRect(g.x, g.y, g.w, g.h, 8); ctx.fill();
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
+
+          const cx = g.x + g.w / 2, cy = g.y + g.h / 2;
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+          ctx.beginPath(); ctx.roundRect(cx - 56, cy - 20, 112, 40, 10); ctx.fill();
+          ctx.fillStyle = '#ffffff'; ctx.font = '800 11px Inter, sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText(g.reqGold > 0 ? `🔒 ${g.reqGold} GOLD KEYS` : `🔒 ${g.reqGreen} LOG POSES`, cx, cy + 4);
+        }
+      }
+
+      function drawChests(nowSec) {
+        for (const c of (serverSnap.chests || [])) {
+          if (c.opened) continue;
+          const rar = RARITIES[c.rarityIndex] || RARITIES[0];
+          const bob = Math.sin(nowSec * 3.5 + c.bob) * 3;
+          ctx.fillStyle = rar.glow;
+          ctx.beginPath(); ctx.ellipse(c.x, c.y + 8, 26, 15, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+          ctx.beginPath(); ctx.roundRect(c.x - 11, c.y - 4, 32, 22, 6); ctx.fill();
+          ctx.fillStyle = rar.color;
+          ctx.beginPath(); ctx.roundRect(c.x - 17, c.y - 13 + bob, 34, 24, 7); ctx.fill();
+          ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2.5; ctx.stroke();
+          ctx.fillStyle = '#fef08a'; ctx.fillRect(c.x - 4, c.y - 4 + bob, 8, 8);
+        }
+      }
+
+      function drawEnemies() {
+        for (const en of (serverSnap.enemies || [])) {
+          if (en.hp <= 0) continue;
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
+          ctx.beginPath(); ctx.ellipse(en.x + 4, en.y + en.radius * 0.72, en.radius * 1.05, en.radius * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+
+          ctx.fillStyle = en.hitFlash ? '#ffffff' : en.color;
+          ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2); ctx.fill();
+          ctx.lineWidth = en.boss ? 4 : 2.5;
+          ctx.strokeStyle = en.accent;
+          ctx.stroke();
+
+          if (en.boss) {
+            ctx.fillStyle = '#090d16';
+            ctx.beginPath();
+            ctx.moveTo(en.x - 24, en.y - 34); ctx.lineTo(en.x - 16, en.y - 78);
+            ctx.lineTo(en.x, en.y - 86); ctx.lineTo(en.x + 16, en.y - 78); ctx.lineTo(en.x + 24, en.y - 34);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#ff1e56';
+            ctx.beginPath();
+            ctx.ellipse(en.x - 11, en.y - 6, 6, 3.5, 0, 0, Math.PI * 2);
+            ctx.ellipse(en.x + 11, en.y - 6, 6, 3.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (en.hp < en.maxHp) {
+            const bw = 42;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.fillRect(en.x - bw / 2, en.y - en.radius - 14, bw, 6);
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(en.x - bw / 2 + 1, en.y - en.radius - 13, (bw - 2) * (en.hp / en.maxHp), 4);
+          }
+        }
+      }
+
+      function drawLuffy(p) {
+        const bobY = Math.sin(p.walkBob) * 2.5;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.36)';
+        ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 16, 20, 8.5, 0, 0, Math.PI * 2); ctx.fill();
+
+        const handX = p.x + Math.cos(p.aimAngle) * 22;
+        const handY = p.y + Math.sin(p.aimAngle) * 22 + bobY;
+        ctx.fillStyle = '#fed7aa';
+        ctx.beginPath(); ctx.arc(handX, handY, 7, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(p.x, p.y + bobY, p.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 2.8; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath(); ctx.ellipse(p.x, p.y - 11 + bobY, 24, 11, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.moveTo(p.x - 13, p.y - 13 + bobY); ctx.lineTo(p.x + 13, p.y - 13 + bobY); ctx.stroke();
+      }
+
+      function drawProjectilesAndLasers() {
+        for (const pr of (serverSnap.projectiles || [])) {
+          ctx.fillStyle = pr.color;
+          ctx.beginPath(); ctx.arc(pr.x, pr.y, pr.radius, 0, Math.PI * 2); ctx.fill();
+        }
+        for (const lz of (serverSnap.lasers || [])) {
+          if (lz.warning) {
+            ctx.save(); ctx.strokeStyle = 'rgba(244, 63, 94, 0.75)'; ctx.lineWidth = 4; ctx.setLineDash([12, 10]);
+            ctx.beginPath(); ctx.moveTo(lz.x1, lz.y1); ctx.lineTo(lz.x2, lz.y2); ctx.stroke(); ctx.restore();
+          } else if (lz.firing) {
+            ctx.save(); ctx.strokeStyle = 'rgba(225, 29, 72, 0.5)'; ctx.lineWidth = lz.width + 14;
+            ctx.beginPath(); ctx.moveTo(lz.x1, lz.y1); ctx.lineTo(lz.x2, lz.y2); ctx.stroke();
+            ctx.strokeStyle = '#fef08a'; ctx.lineWidth = lz.width * 0.55;
+            ctx.beginPath(); ctx.moveTo(lz.x1, lz.y1); ctx.lineTo(lz.x2, lz.y2); ctx.stroke(); ctx.restore();
+          }
+        }
+      }
+
+      function drawPalmTrees(p) {
+        if (p.y > 2500) return;
+        for (const [px, py, s] of PALM_TREES) {
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
+          ctx.beginPath(); ctx.ellipse(px + 26 * s, py + 24 * s, 36 * s, 20 * s, 0.35, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#92400e'; ctx.lineWidth = 9 * s;
+          ctx.beginPath(); ctx.moveTo(px, py + 14 * s); ctx.lineTo(px, py - 44 * s); ctx.stroke();
+          ctx.fillStyle = '#15803d';
+          for (let a = 0; a < 5; a++) {
+            const ang = (a / 5) * Math.PI * 2 + 0.3;
+            ctx.save(); ctx.translate(px, py - 44 * s); ctx.rotate(ang);
+            ctx.beginPath(); ctx.ellipse(22 * s, 0, 24 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+          }
+        }
+      }
+
+      function drawFloatingTexts() {
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+          const ft = floatingTexts[i];
+          ft.y -= 0.75;
+          ft.life -= 0.016;
+          if (ft.life <= 0) { floatingTexts.splice(i, 1); continue; }
+          ctx.font = '800 14px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#0f172a'; ctx.fillText(ft.text, ft.x + 1.5, ft.y + 1.5);
+          ctx.fillStyle = ft.color; ctx.fillText(ft.text, ft.x, ft.y);
+        }
+      }
+
+      function drawHitboxes(p) {
+        ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#ef4444';
+        for (const en of (serverSnap.enemies || [])) {
+          if (en.hp > 0) { ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2); ctx.stroke(); }
+        }
+        ctx.strokeStyle = '#38bdf8';
+        for (const w of (serverSnap.walls || [])) ctx.strokeRect(w.x, w.y, w.w, w.h);
+      }
+
+      function renderMinimap(p) {
+        const mw = miniCanvas.width, mh = miniCanvas.height;
+        miniCtx.clearRect(0, 0, mw, mh);
+        const mapX = x => ((x - 260) / 3260) * mw;
+        const mapY = y => ((y - 420) / 1760) * mh;
+        miniCtx.fillStyle = '#0369a1'; miniCtx.fillRect(0, 0, mw, mh);
+        miniCtx.fillStyle = '#fde08d'; miniCtx.fillRect(mapX(300), mapY(460), mapX(1760) - mapX(300), mapY(2140) - mapY(460));
+        miniCtx.fillStyle = '#22c55e'; miniCtx.fillRect(mapX(1760), mapY(460), mapX(2710) - mapX(1760), mapY(2140) - mapY(460));
+        miniCtx.fillStyle = '#334155'; miniCtx.fillRect(mapX(2710), mapY(460), mapX(3480) - mapX(2710), mapY(2140) - mapY(460));
+        miniCtx.fillStyle = '#ffffff'; miniCtx.beginPath(); miniCtx.arc(mapX(p.x), mapY(p.y), 4, 0, Math.PI * 2); miniCtx.fill();
+      }
+
+      function buildDifficultyUI() {
+        const grid = document.getElementById('difficultyGrid');
+        const desc = document.getElementById('difficultyDescText');
+        grid.innerHTML = '';
+        DIFFICULTIES.forEach((d, idx) => {
+          const btn = document.createElement('button');
+          const active = idx === selectedDiffIdx;
+          btn.className = `level-choice rounded-xl px-3 py-3 text-left text-sm font-bold text-white ${active ? 'active' : ''}`;
+          btn.style.borderColor = active ? d.color : '';
+          btn.style.boxShadow = active ? `0 0 24px ${d.color}22` : '';
+          btn.textContent = d.name;
+          btn.onclick = () => { selectedDiffIdx = idx; desc.textContent = d.desc; buildDifficultyUI(); };
+          grid.appendChild(btn);
+        });
+      }
+
+      window.addEventListener('keydown', e => {
+        keys[e.code] = true;
+        if (e.code === 'Escape' && activeModal) { closeModals(); return; }
+        if (!serverSnap || serverSnap.mode !== 'PLAYING' || activeModal) return;
+
+        if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+          e.preventDefault(); sendActionToJava('DASH');
+        } else if (e.code === 'KeyE') {
+          const p = serverSnap.player;
+          if (Math.hypot(p.x - 640, p.y - 1050) <= 82) { openArmory(); return; }
+          if (Math.hypot(p.x - 640, p.y - 1550) <= 82) { openForge(); return; }
+          sendActionToJava('INTERACT');
+        } else if (e.code === 'KeyR') {
+          sendActionToJava('RELOAD');
+        } else if (e.code === 'KeyH') {
+          sendActionToJava('TOGGLE_HITBOXES');
+        } else if (e.code.startsWith('Digit')) {
+          sendActionToJava('SELECT_SLOT', Number(e.code.replace('Digit', '')) - 1);
+        }
+      });
+
+      window.addEventListener('keyup', e => { keys[e.code] = false; });
+      canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+      canvas.addEventListener('mousedown', e => {
+        if (e.button === 0) {
+          mouse.down = true;
+          if (serverSnap && serverSnap.mode === 'PLAYING' && !activeModal) sendActionToJava('FIRE');
+        }
+      });
+      window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
+
+      document.getElementById('btnStartGame').onclick = async () => {
+        const diffName = DIFFICULTIES[selectedDiffIdx].name;
+        const callsign = document.getElementById('inputCallsign').value;
+        seenEventIds.clear();
+        endShown = false;
+        await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ difficulty: diffName, callsign })
+        });
+        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('hudLayer').classList.remove('hidden');
+        await pollJavaState();
+      };
+
+      document.getElementById('btnPlayAgain').onclick = () => {
+        document.getElementById('endModal').classList.add('hidden');
+        document.getElementById('endModal').classList.remove('flex');
+        closeModals();
+        document.getElementById('hudLayer').classList.add('hidden');
+        document.getElementById('startScreen').classList.remove('hidden');
+        mouse.down = false;
+        Object.keys(keys).forEach(key => { keys[key] = false; });
+      };
+
+      document.getElementById('btnToggleHitboxes').onclick = () => sendActionToJava('TOGGLE_HITBOXES');
+      document.getElementById('btnOpenRubricModal').onclick = openRubricModal;
+      document.getElementById('btnCloseArmory').onclick = closeModals;
+      document.getElementById('btnCloseForge').onclick = closeModals;
+      document.getElementById('btnCloseRubric').onclick = closeModals;
+
+      buildDifficultyUI();
+      setInterval(pollJavaState, 33);
+      setInterval(sendInputToJava, 33);
+
+      function loop(ts) {
+        render(ts / 1000);
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    })();
+</script>
+</body>
+</html>
