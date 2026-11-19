@@ -2,14 +2,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class GameEngine {
-    public static final double ENEMY_RESPAWN_SECONDS = 2.0;
+    public static final double ENEMY_RESPAWN_SECONDS = 180.0;
 
     public static final String[] DIFFICULTY_NAMES = {
         "Easy", "Normal", "Hard", "Expert", "Ludicrous"
     };
-    public static final double[] DIFFICULTY_HP_MULT = {0.80, 1.00, 1.35, 1.75, 2.30};
-    public static final double[] DIFFICULTY_DMG_MULT = {0.75, 1.00, 1.30, 1.60, 2.00};
-    public static final int[] DIFFICULTY_GATE_REQ = {4, 5, 6, 7, 8};
+    public static final double[] DIFFICULTY_HP_MULT = {0.55, 0.75, 1.20, 2.00, 3.50};
+    public static final double[] DIFFICULTY_DMG_MULT = {0.40, 0.65, 1.20, 2.20, 3.50};
+    public static final int[] DIFFICULTY_GATE_REQ = {1, 2, 3, 4, 5};
+    public static final double LOG_POSE_DROP_CHANCE = 0.50;
+    private static final int SECRET_VAULT_GOLD_KEY_REQUIREMENT = 3;
 
     private String gameMode;
     private int difficultyIndex;
@@ -32,8 +34,10 @@ public class GameEngine {
     private Player player;
     private final List<WorldObstacle> walls;
     private final List<SectorGate> gates;
+    private final List<PortalRoute> portalRoutes;
     private final List<RarityChest> chests;
     private final List<PirateEnemy> enemies;
+    private final List<LootDrop> lootDrops;
     private final List<Projectile> projectiles;
     private final List<SkyLaser> lasers;
     private final List<String> recentEvents;
@@ -54,8 +58,10 @@ public class GameEngine {
     public GameEngine() {
         this.walls = new ArrayList<>();
         this.gates = new ArrayList<>();
+        this.portalRoutes = new ArrayList<>();
         this.chests = new ArrayList<>();
         this.enemies = new ArrayList<>();
+        this.lootDrops = new ArrayList<>();
         this.projectiles = new ArrayList<>();
         this.lasers = new ArrayList<>();
         this.recentEvents = new ArrayList<>();
@@ -89,8 +95,10 @@ public class GameEngine {
 
         this.walls.clear();
         this.gates.clear();
+        this.portalRoutes.clear();
         this.chests.clear();
         this.enemies.clear();
+        this.lootDrops.clear();
         this.pendingEnemyRespawns.clear();
         this.projectiles.clear();
         this.lasers.clear();
@@ -120,37 +128,63 @@ public class GameEngine {
         double hpMult = DIFFICULTY_HP_MULT[difficultyIndex];
         double dmgMult = DIFFICULTY_DMG_MULT[difficultyIndex];
 
-        walls.add(new WorldObstacle(260, 420, 3260, 40, "cliff"));
-        walls.add(new WorldObstacle(260, 2140, 3260, 40, "cliff"));
+        walls.add(new WorldObstacle(260, 420, 5100, 40, "cliff"));
+        walls.add(new WorldObstacle(260, 2140, 5100, 40, "cliff"));
         walls.add(new WorldObstacle(260, 420, 40, 1760, "cliff"));
-        walls.add(new WorldObstacle(3480, 420, 40, 1760, "cliff"));
+        walls.add(new WorldObstacle(5360, 420, 40, 1760, "cliff"));
 
         walls.add(new WorldObstacle(1740, 460, 38, 750, "fortress"));
         walls.add(new WorldObstacle(1740, 1390, 38, 750, "fortress"));
         gates.add(new SectorGate("gate1", "Sector 1 Sea-Gate", 1740, 1210, 38, 180, gateReq, 0, "#22c55e"));
 
-        walls.add(new WorldObstacle(2690, 460, 38, 750, "fortress"));
-        walls.add(new WorldObstacle(2690, 1390, 38, 750, "fortress"));
-        gates.add(new SectorGate("gate2", "Sector 2 Red-Line Gate", 2690, 1210, 38, 180, gateReq + 1, 0, "#3b82f6"));
+        addSectorBarrier(2690);
+        gates.add(new SectorGate("gate2", "Sector 2 Coral Pass", 2690, 1210, 38, 180,
+                gateReq, 0, "#c27a42"));
+        addSectorBarrier(3590);
+        gates.add(new SectorGate("gate3", "Sector 3 Poneglyph Gate", 3590, 1210, 38, 180,
+                gateReq + 1, 0, "#3b82f6"));
+        addSectorBarrier(4540);
+        gates.add(new SectorGate("gate4", "Sector 4 Red-Line Gate", 4540, 1210, 38, 180,
+                gateReq + 1, 0, "#a74433"));
 
-        walls.add(new WorldObstacle(2060, 460, 28, 210, "ruin"));
-        walls.add(new WorldObstacle(2352, 460, 28, 210, "ruin"));
-        walls.add(new WorldObstacle(2060, 645, 105, 28, "ruin"));
-        walls.add(new WorldObstacle(2275, 645, 105, 28, "ruin"));
-        gates.add(new SectorGate("secret_vault", "Secret Poneglyph Vault", 2165, 645, 110, 28, 0, 3, "#eab308"));
+        walls.add(new WorldObstacle(2960, 460, 28, 210, "ruin"));
+        walls.add(new WorldObstacle(3252, 460, 28, 210, "ruin"));
+        walls.add(new WorldObstacle(2960, 645, 105, 28, "ruin"));
+        walls.add(new WorldObstacle(3175, 645, 105, 28, "ruin"));
+        gates.add(new SectorGate("secret_vault", "Secret Poneglyph Vault", 3065, 645, 110, 28,
+                0, SECRET_VAULT_GOLD_KEY_REQUIREMENT, "#eab308"));
 
         walls.add(new WorldObstacle(1020, 950, 68, 56, "rock"));
         walls.add(new WorldObstacle(1180, 1520, 74, 58, "rock"));
         walls.add(new WorldObstacle(1450, 1060, 64, 64, "crate"));
         walls.add(new WorldObstacle(1480, 1560, 64, 64, "crate"));
-        walls.add(new WorldObstacle(1960, 980, 82, 64, "ruin"));
-        walls.add(new WorldObstacle(2020, 1580, 82, 64, "ruin"));
-        walls.add(new WorldObstacle(2380, 1140, 76, 76, "ruin"));
-        walls.add(new WorldObstacle(2420, 1560, 84, 62, "ruin"));
-        walls.add(new WorldObstacle(2920, 940, 76, 66, "obsidian"));
-        walls.add(new WorldObstacle(2960, 1620, 76, 66, "obsidian"));
-        walls.add(new WorldObstacle(3180, 1080, 68, 68, "obsidian"));
-        walls.add(new WorldObstacle(3180, 1480, 68, 68, "obsidian"));
+        walls.add(new WorldObstacle(2860, 980, 82, 64, "ruin"));
+        walls.add(new WorldObstacle(2920, 1580, 82, 64, "ruin"));
+        walls.add(new WorldObstacle(3280, 1140, 76, 76, "ruin"));
+        walls.add(new WorldObstacle(3320, 1560, 84, 62, "ruin"));
+        walls.add(new WorldObstacle(4720, 940, 76, 66, "obsidian"));
+        walls.add(new WorldObstacle(4760, 1620, 76, 66, "obsidian"));
+        walls.add(new WorldObstacle(4980, 1080, 68, 68, "obsidian"));
+        walls.add(new WorldObstacle(4980, 1480, 68, 68, "obsidian"));
+
+        walls.add(new WorldObstacle(900, 920, 70, 58, "rock"));
+        walls.add(new WorldObstacle(1320, 1280, 72, 64, "crate"));
+        walls.add(new WorldObstacle(1510, 1780, 86, 62, "ruin"));
+        walls.add(new WorldObstacle(3080, 1740, 72, 72, "ruin"));
+        walls.add(new WorldObstacle(3370, 920, 70, 70, "rock"));
+        walls.add(new WorldObstacle(3450, 1780, 76, 64, "crate"));
+        walls.add(new WorldObstacle(4800, 1760, 80, 72, "obsidian"));
+        walls.add(new WorldObstacle(5100, 980, 72, 72, "obsidian"));
+        walls.add(new WorldObstacle(820, 680, 66, 58, "rock"));
+        walls.add(new WorldObstacle(1625, 700, 72, 62, "crate"));
+        walls.add(new WorldObstacle(1810, 1960, 78, 64, "rock"));
+        walls.add(new WorldObstacle(2350, 620, 72, 60, "crate"));
+        walls.add(new WorldObstacle(3000, 1940, 80, 68, "ruin"));
+        walls.add(new WorldObstacle(3500, 1050, 72, 64, "rock"));
+        walls.add(new WorldObstacle(3790, 620, 76, 62, "crate"));
+        walls.add(new WorldObstacle(4290, 1910, 78, 64, "rock"));
+        walls.add(new WorldObstacle(4630, 700, 74, 62, "obsidian"));
+        walls.add(new WorldObstacle(5250, 1940, 80, 68, "obsidian"));
 
         walls.add(new WorldObstacle(1200, 2700, 1200, 42, "throne_wall"));
         walls.add(new WorldObstacle(1200, 3610, 1200, 42, "throne_wall"));
@@ -167,23 +201,40 @@ public class GameEngine {
             spawnChestAtValidLocation(900, 1680, 560, 2040, RarityChest.rollWeightedRarity());
         }
         for (int i = 0; i < 6; i++) {
-            spawnChestAtValidLocation(1820, 2630, 720, 2040, RarityChest.rollWeightedRarity());
+            spawnChestAtValidLocation(2720, 3530, 720, 2040, RarityChest.rollWeightedRarity());
         }
         for (int i = 0; i < 5; i++) {
             int r = (Math.random() < 0.20) ? 3 : RarityChest.rollWeightedRarity();
-            spawnChestAtValidLocation(2760, 3380, 560, 2040, r);
+            spawnChestAtValidLocation(4560, 5180, 560, 2040, r);
         }
 
         chests.add(new RarityChest(1340, 3440, 3));
         chests.add(new RarityChest(2260, 3440, 4));
 
-        spawnPirates(hpMult, dmgMult);
+        portalRoutes.add(new PortalRoute("sector1", "Coral Shores", 340, 1080, 1600, 1300, 60));
+        portalRoutes.add(new PortalRoute("sector2", "Windward Keys", 430, 1080, 2200, 1300, 100));
+        portalRoutes.add(new PortalRoute("sector3", "Poneglyph Jungle", 520, 1080, 3120, 1300, 160));
+        portalRoutes.add(new PortalRoute("sector4", "Cinder Coast", 610, 1080, 4070, 1300, 230));
+        portalRoutes.add(new PortalRoute("sector5", "Red-Line Cliffs", 700, 1080, 4960, 1300, 320));
+
+        spawnPirates(gateReq, hpMult, dmgMult);
 
         int laserDmg = (int) Math.round(28 * dmgMult);
-        lasers.add(new SkyLaser(2860, 520, 2860, 2080, 3.6, 0.4, 1.3, 0.85, 26, false, laserDmg));
-        lasers.add(new SkyLaser(3060, 520, 3060, 2080, 3.6, 1.6, 1.3, 0.85, 26, false, laserDmg));
-        lasers.add(new SkyLaser(3220, 520, 3220, 2080, 3.6, 2.8, 1.3, 0.85, 26, false, laserDmg));
-        lasers.add(new SkyLaser(2760, 1300, 3420, 1300, 4.2, 1.1, 1.4, 0.90, 24, false, laserDmg));
+        lasers.add(new SkyLaser(4660, 520, 4660, 2080, 3.6, 0.4, 1.3, 0.85, 26, false, laserDmg));
+        lasers.add(new SkyLaser(4860, 520, 4860, 2080, 3.6, 1.6, 1.3, 0.85, 26, false, laserDmg));
+        lasers.add(new SkyLaser(5020, 520, 5020, 2080, 3.6, 2.8, 1.3, 0.85, 26, false, laserDmg));
+        lasers.add(new SkyLaser(4560, 1300, 5220, 1300, 4.2, 1.1, 1.4, 0.90, 24, false, laserDmg));
+    }
+
+    private void addSectorBarrier(double x) {
+        walls.add(new WorldObstacle(x, 460, 38, 750, "fortress"));
+        walls.add(new WorldObstacle(x, 1390, 38, 750, "fortress"));
+    }
+
+    private double mapEnemyX(double originalX) {
+        if (originalX < 1740) return originalX;
+        if (originalX < 2690) return originalX + 900;
+        return originalX + 1800;
     }
 
     private void spawnChestAtValidLocation(double minX, double maxX, double minY, double maxY, int rarityIdx) {
@@ -199,7 +250,15 @@ public class GameEngine {
             }
 
             boolean blocked = false;
+            for (PortalRoute route : portalRoutes) {
+                if (Math.hypot(cx - route.getDockX(), cy - route.getDockY()) < 130.0
+                        || Math.hypot(cx - route.getDestinationX(), cy - route.getDestinationY()) < 130.0) {
+                    blocked = true;
+                    break;
+                }
+            }
             for (int i = 0; i < walls.size(); i++) {
+                if (blocked) break;
                 WorldObstacle w = walls.get(i);
                 if (cx + 36 > w.getX() && cx - 36 < w.getX() + w.getWidth() &&
                     cy + 36 > w.getY() && cy - 36 < w.getY() + w.getHeight()) {
@@ -214,7 +273,7 @@ public class GameEngine {
         }
     }
 
-    private void spawnPirates(double hpMult, double dmgMult) {
+    private void spawnPirates(int gateReq, double hpMult, double dmgMult) {
 
         addEnemy("buggy", "Buggy Pirate", 1050, 820, 21, 65, 125, 12, 1.65, 340, 8, 1, 0, "#ef4444", "#38bdf8", false, hpMult, dmgMult);
         addEnemy("buggy", "Buggy Pirate", 1120, 1340, 21, 65, 125, 12, 1.65, 340, 8, 1, 0, "#ef4444", "#38bdf8", false, hpMult, dmgMult);
@@ -240,15 +299,82 @@ public class GameEngine {
         addEnemy("cp0", "CP0 Masked Agent", 3220, 1660, 22, 220, 192, 26, 1.15, 330, 22, 2, 0, "#f8fafc", "#1e293b", false, hpMult, dmgMult);
         addEnemy("admiral", "Navy Admiral", 3320, 1120, 30, 340, 125, 32, 1.40, 420, 34, 2, 1, "#eab308", "#dc2626", false, hpMult, dmgMult);
 
+        addAddedSectorEnemy("marine", "Coral Coast Marine", 1880, 900, 22, 90, 118, 18, 1.50, 320, 12, 0, "#c65a43", "#f5d0b5", hpMult, dmgMult);
+        addAddedSectorEnemy("sniper", "Windward Lookout", 2110, 1650, 20, 120, 110, 22, 1.55, 460, 16, 0, "#714b3e", "#f2c39f", hpMult, dmgMult);
+        addAddedSectorEnemy("bruiser", "Ironclad Raider", 2430, 1060, 29, 220, 92, 28, 1.45, 180, 26, 0, "#8e4937", "#e5a181", hpMult, dmgMult);
+        addAddedSectorEnemy("marine", "Cinder Coast Marine", 3780, 900, 23, 180, 145, 28, 1.25, 350, 24, 0, "#9d3e31", "#f0b77e", hpMult, dmgMult);
+        addAddedSectorEnemy("sniper", "Red-Line Sharpshooter", 4080, 1650, 21, 240, 128, 34, 1.20, 540, 30, 0, "#4d3834", "#e9c4a4", hpMult, dmgMult);
+        addAddedSectorEnemy("admiral", "Cinder Coast Warden", 4380, 1120, 31, 390, 142, 38, 1.25, 440, 38, 0, "#c27a42", "#f4d18c", hpMult, dmgMult);
+
+        ensureSectionEnemyCount(260, 1740, gateReq * 2, hpMult, dmgMult,
+                new double[][] {{620, 740}, {860, 1840}, {1420, 640}, {1580, 1880}, {680, 1300}});
+        ensureSectionEnemyCount(1778, 2690, gateReq * 2, hpMult, dmgMult,
+                new double[][] {{1840, 700}, {2020, 1860}, {2220, 740}, {2500, 1860}, {2600, 980},
+                        {1830, 1780}, {2260, 1880}, {2600, 740}, {2500, 980}});
+        ensureSectionEnemyCount(2728, 3590, (gateReq + 1) * 2, hpMult, dmgMult,
+                new double[][] {{2760, 740}, {2880, 1900}, {3060, 760}, {3400, 1880},
+                        {3500, 760}, {2780, 1840}, {3440, 980}});
+        ensureSectionEnemyCount(3628, 4540, (gateReq + 1) * 2, hpMult, dmgMult,
+                new double[][] {{3680, 720}, {3860, 1880}, {4020, 740}, {4200, 1880}, {4480, 740},
+                        {3700, 1840}, {3880, 720}, {4100, 1880}, {4300, 740}, {4480, 1880}, {3720, 980}});
+        ensureSectionEnemyCount(4578, 5360, (gateReq + 2) * 2, hpMult, dmgMult,
+                new double[][] {{4620, 740}, {4680, 1880}, {4900, 740}, {5200, 1840}, {5300, 740},
+                        {4600, 1840}, {4820, 1880}, {5000, 740}, {5240, 1880}, {5320, 980}});
+
         addEnemy("imu", "IMU — Sovereign of the Empty Throne", 1800, 2920, 46, 2400, 118, 34, 1.35, 680, 150, 0, 0, "#090d16", "#e11d48", true, hpMult, dmgMult);
+    }
+
+    private void ensureSectionEnemyCount(double minX, double maxX, int targetCount,
+                                         double hpMult, double dmgMult, double[][] spawnPoints) {
+        int currentCount = 0;
+        for (PirateEnemy enemy : enemies) {
+            if (!enemy.isBoss() && enemy.getX() >= minX && enemy.getX() < maxX) {
+                currentCount++;
+            }
+        }
+
+        for (int i = enemies.size() - 1; currentCount > targetCount && i >= 0; i--) {
+            PirateEnemy enemy = enemies.get(i);
+            if (!enemy.isBoss() && enemy.getX() >= minX && enemy.getX() < maxX) {
+                enemies.remove(i);
+                currentCount--;
+            }
+        }
+
+        String[] types = {"marine", "bruiser", "sniper", "fishman", "elite_pink"};
+        String[] names = {"Ashen Deckhand", "Ironjaw Raider", "Dreadwake Lookout", "Reef Stalker", "Blackflag Captain"};
+        String[] coats = {"#8f3027", "#49302a", "#514238", "#315b60", "#852e35"};
+        String[] trims = {"#edb36e", "#c65a43", "#d4b28b", "#e29c68", "#e7b66c"};
+        int missing = Math.min(targetCount - currentCount, spawnPoints.length);
+        for (int i = 0; i < missing; i++) {
+            double[] point = spawnPoints[i];
+            int archetype = i % types.length;
+            addAddedSectorEnemy(types[archetype], names[archetype], point[0], point[1],
+                    21 + archetype % 3 * 2, 100 + archetype * 24, 112 + archetype * 8,
+                    18 + archetype * 4, 1.5 - archetype * 0.05, 340 + archetype * 35,
+                    12 + archetype * 4, 0, coats[archetype], trims[archetype], hpMult, dmgMult);
+        }
     }
 
     private void addEnemy(String type, String name, double x, double y, double radius, int hp,
                           double speed, int dmg, double fireRate, double range, int berries,
                           int greenDrop, int goldDrop, String c1, String c2, boolean boss,
                           double hpMult, double dmgMult) {
-        enemies.add(new PirateEnemy(nextEnemyId++, type, name, x, y, radius, hp, speed, dmg,
-                fireRate, range, berries, greenDrop, goldDrop, c1, c2, boss, hpMult, dmgMult));
+        int pressure = difficultyIndex;
+        double worldX = boss ? x : mapEnemyX(x);
+        enemies.add(new PirateEnemy(nextEnemyId++, type, name, worldX, y, radius, hp,
+                speed * 0.85 * (1.0 + pressure * 0.05), dmg, fireRate / (1.15 + pressure * 0.10),
+                range, berries, greenDrop, goldDrop, c1, c2, boss, hpMult, dmgMult));
+    }
+
+    private void addAddedSectorEnemy(String type, String name, double x, double y, double radius,
+                                     int hp, double speed, int dmg, double fireRate, double range,
+                                     int berries, int goldDrop, String c1, String c2,
+                                     double hpMult, double dmgMult) {
+        int pressure = difficultyIndex;
+        enemies.add(new PirateEnemy(nextEnemyId++, type, name, x, y, radius, hp,
+                speed * 0.85 * (1.0 + pressure * 0.05), dmg, fireRate / (1.15 + pressure * 0.10),
+                range, berries, 0, goldDrop, c1, c2, false, hpMult, dmgMult));
     }
 
     public synchronized void updateInputState(boolean up, boolean down, boolean left, boolean right,
@@ -317,6 +443,28 @@ public class GameEngine {
     }
 
     private String handleInteract() {
+        for (PortalRoute route : portalRoutes) {
+            if (!route.isNear(player.getX(), player.getY())) continue;
+            if (!route.isUnlocked()) {
+                if (!player.spendBerries(route.getBerryCost())) {
+                    pushEvent("Need " + route.getBerryCost() + " berries to unlock " + route.getName(),
+                            "#fbbf24", player.getX(), player.getY() - 24);
+                    return "PORTAL_CANNOT_AFFORD";
+                }
+                route.unlock();
+                pushEvent(route.getName() + " PORTAL UNLOCKED", "#fbbf24",
+                        player.getX(), player.getY() - 24);
+                return "PORTAL_UNLOCKED";
+            }
+            if (route.isAtDock(player.getX(), player.getY())) {
+                player.setPosition(route.getDestinationX(), route.getDestinationY());
+            } else {
+                player.setPosition(route.getDockX(), route.getDockY());
+            }
+            pushEvent("TRAVELED VIA " + route.getName().toUpperCase(), "#fbbf24",
+                    player.getX(), player.getY() - 24);
+            return "WARPED";
+        }
 
         for (int i = 0; i < chests.size(); i++) {
             RarityChest c = chests.get(i);
@@ -349,35 +497,29 @@ public class GameEngine {
             }
         }
 
-        if (player.distanceTo(760, 1300) <= 76.0) {
-            player.setPosition(1860, 1300);
-            pushEvent("FAST TRAVELED TO JUNGLE!", "#22d3ee", player.getX(), player.getY() - 26);
-            return "WARPED";
-        }
-        if (player.distanceTo(1860, 1120) <= 76.0 || player.distanceTo(2810, 1120) <= 76.0) {
-            player.setPosition(760, 1300);
-            pushEvent("FAST TRAVELED TO SAFE HARBOR!", "#22d3ee", player.getX(), player.getY() - 26);
-            return "WARPED";
-        }
-
-        if (!secretWeaponClaimed && player.distanceTo(2220, 540) <= 78.0) {
+        if (!secretWeaponClaimed && player.distanceTo(3120, 540) <= 78.0) {
+            if (!secretVaultUnlocked) {
+                pushEvent("Unlock the Secret Poneglyph Vault with 3 Gold Keys first!",
+                        "#fbbf24", 3120, 510);
+                return "SECRET_LOCKED";
+            }
             secretWeaponClaimed = true;
             Weapon hakiRod = player.getWeapons().get(5);
             hakiRod.unlockWithRarity(3);
             player.selectWeaponSlot(5);
-            pushEvent("ACQUIRED: CONQUEROR'S HAKI ROD!", "#f43f5e", 2220, 510);
+            pushEvent("ACQUIRED: CONQUEROR'S HAKI ROD!", "#f43f5e", 3120, 510);
             return "SECRET_CLAIMED";
         }
 
         int throneReq = DIFFICULTY_GATE_REQ[difficultyIndex] + 2;
-        if (player.distanceTo(3320, 1300) <= 90.0) {
+        if (player.distanceTo(5120, 1300) <= 90.0) {
             if (player.getGreenLogPoses() >= throneReq) {
                 player.spendGreenLogPoses(throneReq);
                 player.setPosition(1800, 3480);
                 pushEvent("ENTERED THE EMPTY THRONE!", "#fb7185", 1800, 3420);
                 return "ENTERED_THRONE";
             } else {
-                pushEvent("Need " + throneReq + " Green Log Poses!", "#f87171", 3320, 1265);
+                pushEvent("Need " + throneReq + " Green Log Poses!", "#f87171", 5120, 1265);
                 return "PORTAL_LOCKED";
             }
         }
@@ -508,8 +650,30 @@ public class GameEngine {
         updatePendingEnemyRespawns(dt);
 
         updateProjectiles(dt);
+        enemies.removeIf(enemy -> !enemy.isAlive());
+
+        updateLootDrops(dt);
 
         updateLasers(dt);
+    }
+
+    private void updateLootDrops(double dt) {
+        for (int i = lootDrops.size() - 1; i >= 0; i--) {
+            LootDrop drop = lootDrops.get(i);
+            drop.update(dt);
+            if (player.distanceTo(drop.getX(), drop.getY()) > 52.0) {
+                continue;
+            }
+            if (drop.isBerry()) {
+                player.addBerries(drop.getAmount());
+                totalBerriesEarned += drop.getAmount();
+                pushEvent("+B" + drop.getAmount(), "#fbbf24", drop.getX(), drop.getY() - 16);
+            } else {
+                player.addGreenLogPoses(drop.getAmount());
+                pushEvent("+" + drop.getAmount() + " LOG POSE", "#86efac", drop.getX(), drop.getY() - 16);
+            }
+            lootDrops.remove(i);
+        }
     }
 
     private void updatePendingEnemyRespawns(double dt) {
@@ -529,10 +693,11 @@ public class GameEngine {
     }
 
     private void resolveEntityWalls(Player p) {
-        double px = p.getX();
-        double py = p.getY();
-        double r = p.getRadius();
+        double[] resolved = resolveEntityPosition(p.getX(), p.getY(), p.getRadius());
+        p.setPosition(resolved[0], resolved[1]);
+    }
 
+    private double[] resolveEntityPosition(double px, double py, double r) {
         for (int i = 0; i < walls.size(); i++) {
             double[] res = walls.get(i).resolveCircleCollision(px, py, r);
             px = res[0];
@@ -541,23 +706,33 @@ public class GameEngine {
         for (int i = 0; i < gates.size(); i++) {
             SectorGate g = gates.get(i);
             if (!g.isOpened()) {
-                double closestX = Math.max(g.getX(), Math.min(px, g.getX() + g.getWidth()));
-                double closestY = Math.max(g.getY(), Math.min(py, g.getY() + g.getHeight()));
-                double dx = px - closestX;
-                double dy = py - closestY;
-                double distSq = dx * dx + dy * dy;
-                if (distSq < r * r) {
-                    double dist = Math.sqrt(distSq);
-                    if (dist > 0.0001) {
-                        px += (dx / dist) * (r - dist);
-                        py += (dy / dist) * (r - dist);
-                    } else {
-                        px += r;
-                    }
-                }
+                double[] res = resolveCircleAgainstRectangle(px, py, r, g.getX(), g.getY(),
+                        g.getWidth(), g.getHeight());
+                px = res[0];
+                py = res[1];
             }
         }
-        p.setPosition(px, py);
+        return new double[]{px, py};
+    }
+
+    private double[] resolveCircleAgainstRectangle(double cx, double cy, double radius,
+                                                    double x, double y, double width, double height) {
+        double closestX = Math.max(x, Math.min(cx, x + width));
+        double closestY = Math.max(y, Math.min(cy, y + height));
+        double dx = cx - closestX;
+        double dy = cy - closestY;
+        double distanceSquared = dx * dx + dy * dy;
+        if (distanceSquared < radius * radius) {
+            double distance = Math.sqrt(distanceSquared);
+            if (distance > 0.0001) {
+                double overlap = radius - distance;
+                cx += dx / distance * overlap;
+                cy += dy / distance * overlap;
+            } else {
+                cx += radius;
+            }
+        }
+        return new double[]{cx, cy};
     }
 
     private void updateEnemies(double dt) {
@@ -629,14 +804,8 @@ public class GameEngine {
                 }
             }
 
-            double ex = en.getX();
-            double ey = en.getY();
-            for (int w = 0; w < walls.size(); w++) {
-                double[] res = walls.get(w).resolveCircleCollision(ex, ey, en.getRadius());
-                ex = res[0];
-                ey = res[1];
-            }
-            en.setPosition(ex, ey);
+            double[] resolved = resolveEntityPosition(en.getX(), en.getY(), en.getRadius());
+            en.setPosition(resolved[0], resolved[1]);
         }
     }
 
@@ -711,11 +880,21 @@ public class GameEngine {
     }
 
     void handleEnemyDefeated(PirateEnemy en) {
+        handleEnemyDefeated(en, Math.random());
+    }
+
+    void handleEnemyDefeated(PirateEnemy en, double logPoseRoll) {
         enemiesDefeatedCount++;
+        if (en.getBerryDrop() > 0) {
+            lootDrops.add(new LootDrop("BERRY", en.getX() - 12, en.getY() + 8, en.getBerryDrop()));
+        }
+        boolean logPoseDropped = shouldDropLogPose(logPoseRoll)
+                || shouldGuaranteeLogPose(en);
+        if (logPoseDropped) {
+            lootDrops.add(new LootDrop("LOG_POSE", en.getX() + 14, en.getY() + 8, 1));
+        }
         if (en.isBoss()) {
             imuDefeated = true;
-            player.addBerries(en.getBerryDrop());
-            totalBerriesEarned += en.getBerryDrop();
             pushEvent("IMU DEFEATED! RETURN TO THE THOUSAND SUNNY!", "#fbbf24", en.getX(), en.getY() - 30);
             chests.add(new RarityChest(en.getX() - 60, en.getY() + 40, 4));
             chests.add(new RarityChest(en.getX() + 60, en.getY() + 40, 4));
@@ -723,18 +902,80 @@ public class GameEngine {
         }
 
         pendingEnemyRespawns.add(new PendingEnemyRespawn(en, ENEMY_RESPAWN_SECONDS));
-        player.addBerries(en.getBerryDrop());
-        totalBerriesEarned += en.getBerryDrop();
-        if (en.getGreenKeyDrop() > 0) {
-            player.addGreenLogPoses(en.getGreenKeyDrop());
-        }
-        if (en.getGoldKeyDrop() > 0) {
+        int goldKeysAwarded = getGuaranteedGoldKeyAward(en);
+        for (int i = 0; i < goldKeysAwarded; i++) {
             player.addGoldKeycard();
         }
-        String rewardMsg = "+B" + en.getBerryDrop()
-                + (en.getGreenKeyDrop() > 0 ? "  +" + en.getGreenKeyDrop() + " LogPose" : "")
-                + (en.getGoldKeyDrop() > 0 ? "  +1 GOLD KEY!" : "");
-        pushEvent(rewardMsg, "#34d399", en.getX(), en.getY() - 20);
+        String rewardMsg = (en.getBerryDrop() > 0 ? "BERRIES DROPPED" : "")
+                + (logPoseDropped ? "  LOG POSE DROPPED" : "")
+                + (goldKeysAwarded > 0 ? "  +" + goldKeysAwarded
+                        + (goldKeysAwarded == 1 ? " GOLD KEY!" : " GOLD KEYS!") : "");
+        if (!rewardMsg.isEmpty()) {
+            pushEvent(rewardMsg, "#34d399", en.getX(), en.getY() - 20);
+        }
+    }
+
+    private boolean shouldGuaranteeLogPose(PirateEnemy defeatedEnemy) {
+        int requiredPoses = DIFFICULTY_GATE_REQ[difficultyIndex] + 2;
+        SectorGate nextGreenGate = null;
+        for (SectorGate gate : gates) {
+            if (gate.getRequiredGreenKeys() > 0 && !gate.isOpened()
+                    && gate.getX() > defeatedEnemy.getX()) {
+                nextGreenGate = gate;
+                break;
+            }
+        }
+        if (nextGreenGate != null) {
+            requiredPoses = nextGreenGate.getRequiredGreenKeys();
+        } else if (defeatedEnemy.getY() > 2500.0) {
+            return false;
+        }
+
+        int missingPoses = requiredPoses - player.getGreenLogPoses();
+        if (missingPoses <= 0) {
+            return false;
+        }
+
+        double sectionStart = 260.0;
+        double[] sectionEnds = {1740.0, 2690.0, 3590.0, 4540.0, 5360.0};
+        for (double sectionEnd : sectionEnds) {
+            if (defeatedEnemy.getX() < sectionEnd) {
+                int remainingEnemies = 0;
+                for (PirateEnemy enemy : enemies) {
+                    if (enemy != defeatedEnemy && enemy.isAlive()
+                            && !enemy.isBoss()
+                            && enemy.getX() >= sectionStart
+                            && enemy.getX() < sectionEnd) {
+                        remainingEnemies++;
+                    }
+                }
+                return remainingEnemies < missingPoses;
+            }
+            sectionStart = sectionEnd;
+        }
+        return false;
+    }
+
+    private int getGuaranteedGoldKeyAward(PirateEnemy defeatedEnemy) {
+        int keyCount = player.getGoldKeycards();
+        if (secretVaultUnlocked || keyCount >= SECRET_VAULT_GOLD_KEY_REQUIREMENT) {
+            return Math.min(defeatedEnemy.getGoldKeyDrop(),
+                    SECRET_VAULT_GOLD_KEY_REQUIREMENT - keyCount);
+        }
+
+        int missingKeys = SECRET_VAULT_GOLD_KEY_REQUIREMENT - keyCount;
+        int keysAlreadyAwarded = Math.min(defeatedEnemy.getGoldKeyDrop(), missingKeys);
+        int futureGuaranteedKeys = 0;
+        for (PirateEnemy enemy : enemies) {
+            if (enemy != defeatedEnemy && enemy.isAlive() && !enemy.isBoss()) {
+                futureGuaranteedKeys += enemy.getGoldKeyDrop();
+            }
+        }
+        return Math.min(missingKeys, Math.max(keysAlreadyAwarded, missingKeys - futureGuaranteedKeys));
+    }
+
+    static boolean shouldDropLogPose(double roll) {
+        return roll >= 0.0 && roll < LOG_POSE_DROP_CHANCE;
     }
 
     private void updateLasers(double dt) {
@@ -777,10 +1018,14 @@ public class GameEngine {
             rawCode = "ZONE 0:SAFE HARBOR DOCK";
         } else if (player.getX() < 1755.0) {
             rawCode = "ZONE 1:EAST BLUE CORAL SHORES";
-        } else if (player.getX() < 2705.0) {
-            rawCode = "ZONE 2:PONEGLYPH JUNGLE";
+        } else if (player.getX() < 2690.0) {
+            rawCode = "ZONE 2:WINDWARD KEYS";
+        } else if (player.getX() < 3590.0) {
+            rawCode = "ZONE 3:PONEGLYPH JUNGLE";
+        } else if (player.getX() < 4540.0) {
+            rawCode = "ZONE 4:CINDER COAST";
         } else {
-            rawCode = "ZONE 3:MARY GEOISE VOLCANIC CLIFFS";
+            rawCode = "ZONE 5:RED-LINE CLIFFS";
         }
         int sep = rawCode.indexOf(":");
         if (sep != -1) {
@@ -890,6 +1135,20 @@ public class GameEngine {
         }
         sb.append("],");
 
+        sb.append("\"portalRoutes\":[");
+        for (int i = 0; i < portalRoutes.size(); i++) {
+            PortalRoute route = portalRoutes.get(i);
+            if (i > 0) sb.append(",");
+            sb.append("{\"id\":\"").append(route.getId()).append("\",\"name\":\"")
+              .append(escapeJson(route.getName())).append("\",\"dockX\":").append(route.getDockX())
+              .append(",\"dockY\":").append(route.getDockY())
+              .append(",\"destinationX\":").append(route.getDestinationX())
+              .append(",\"destinationY\":").append(route.getDestinationY())
+              .append(",\"cost\":").append(route.getBerryCost())
+              .append(",\"unlocked\":").append(route.isUnlocked()).append("}");
+        }
+        sb.append("],");
+
         sb.append("\"chests\":[");
         for (int i = 0; i < chests.size(); i++) {
             RarityChest c = chests.get(i);
@@ -898,6 +1157,18 @@ public class GameEngine {
               .append(",\"rarityIndex\":").append(c.getRarityIndex())
               .append(",\"opened\":").append(c.isOpened())
               .append(",\"bob\":").append(String.format(java.util.Locale.US, "%.2f", c.getBobPhase())).append("}");
+        }
+        sb.append("],");
+
+        sb.append("\"lootDrops\":[");
+        for (int i = 0; i < lootDrops.size(); i++) {
+            LootDrop drop = lootDrops.get(i);
+            if (i > 0) sb.append(",");
+            sb.append("{\"type\":\"").append(drop.getType()).append("\",\"x\":")
+              .append(String.format(java.util.Locale.US, "%.1f", drop.getX()))
+              .append(",\"y\":").append(String.format(java.util.Locale.US, "%.1f", drop.getY()))
+              .append(",\"amount\":").append(drop.getAmount())
+              .append(",\"bob\":").append(String.format(java.util.Locale.US, "%.2f", drop.getBobPhase())).append("}");
         }
         sb.append("],");
 
@@ -959,4 +1230,6 @@ public class GameEngine {
     List<PirateEnemy> getEnemies() { return enemies; }
     public List<RarityChest> getChests() { return chests; }
     public List<SectorGate> getGates() { return gates; }
+    List<LootDrop> getLootDrops() { return lootDrops; }
+    List<PortalRoute> getPortalRoutes() { return portalRoutes; }
 }

@@ -126,6 +126,7 @@ public class Weapon {
     public String getIcon() { return icon; }
     public int getUnlockCost() { return unlockCost; }
     public int getClipSize() { return clipSize; }
+    public double getReloadDuration() { return reloadDuration; }
     public int getBaseDamage() { return baseDamage; }
     public double getProjectileSpeed() { return projectileSpeed; }
     public double getProjectileRadius() { return projectileRadius; }
