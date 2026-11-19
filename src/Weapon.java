@@ -1,8 +1,9 @@
 public class Weapon {
+    public static final double ENERGY_COST_PER_SHOT = 1.0;
     public static final String[] RARITY_NAMES = {"Common", "Uncommon", "Rare", "Epic", "Legendary"};
     public static final String[] RARITY_COLORS = {"#94a3b8", "#22c55e", "#3b82f6", "#a855f7", "#eab308"};
     public static final double[] RARITY_MULTIPLIERS = {1.00, 1.35, 1.80, 2.35, 3.10};
-    public static final int[] UPGRADE_COSTS = {45, 90, 160, 280, 0};
+    public static final int[] UPGRADE_COSTS = {23, 45, 80, 140, 0};
 
     private final String id;
     private final String name;

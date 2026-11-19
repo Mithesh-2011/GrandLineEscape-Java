@@ -11,7 +11,7 @@ GrandLine-JavaBackend/
 ├── src/
 │   ├── Main.java               # Entry point: runs boundary tests, starts server & opens browser
 │   ├── GameServer.java         # Built-in Java HttpServer (port 8080) & REST JSON API
-│   ├── GameEngine.java         # 60 Hz simulation engine, map builder, collisions, trackers & JSON serializer
+│   ├── GameEngine.java         # 60 Hz simulation engine, world builder, collisions & JSON serializer
 │   ├── Player.java             # Monkey D. Luffy class (HP, Energy, Dash, Weapons, String methods)
 │   ├── Weapon.java             # 6 weapons with Common -> Legendary rarity upgrades
 │   ├── PirateEnemy.java        # Villain pirates & multi-phase Final Boss IMU
@@ -21,12 +21,11 @@ GrandLine-JavaBackend/
 │   ├── LootDrop.java           # Physical berry and Log Pose pickups
 │   ├── Projectile.java         # Active projectiles with piercing support
 │   ├── SkyLaser.java           # Stage 3 Buster Call & Imu Mother Flame orbital sky-beams
-│   └── BoundaryTestSuite.java  # Automated Unit 1 & 2 boundary & input-validation test suite
+│   └── BoundaryTestSuite.java  # Automated gameplay boundary and input-validation tests
 ├── web/
-│   └── index.html              # 60 FPS browser renderer, illustrated level-selection screen, HUD and minimap
+│   └── index.html              # 60 FPS browser renderer, illustrated level-selection screen and HUD
 ├── run.bat                     # One-click Windows compile & launch script
 ├── run.sh                      # One-click macOS / Linux compile & launch script
-├── APCSA_Project_Planning_And_Rubric_Guide.md  # Ready-to-submit AP CSA planning template & video script
 └── README.md                   # Architecture & gameplay guide
 ```
 
@@ -54,21 +53,25 @@ Once started, open **`http://localhost:8080`** in your browser (it opens automat
 
 ## How to Play
 
-1. Choose a level and captain name on the home screen, then select **Start game**.
-2. You start with **0 berries**. Defeated pirates leave berry pickups and have a **50% chance** to drop a Log Pose; move close to collect either item.
-3. Chests are sparse, must be opened with **E** when nearby, give only **1–12 berries**, and take 40 seconds to return after opening.
-4. Cross five surface sections, collecting Log Poses and Gold Keys to open the guarded gates. The final enemies in a section guarantee any Log Poses still needed for its gate. Gold Keys are guaranteed when needed to open the Secret Poneglyph Vault and claim Conqueror's Haki. Enemies cannot cross a closed gate.
-5. Spend berries at the armory and forge. New weapons cost **35–160 berries**; rarity upgrades cost **45, 90, 160, then 280 berries**.
-6. Five dock portal routes connect the docks with the surface sections. Each route costs **60–320 berries** to unlock and stays open for the rest of that run.
-7. Pirates return at their defeat location after **3 minutes**. All weapons take **3 seconds** to reload; energy regenerates at **1 point per second**. Enemy health and damage scale with difficulty.
-8. Defeat the final boss and return to the ship to win.
+1. Choose Easy, Normal, Hard, or Expert and a captain name on the home screen, then select **Start game**. Easy uses weaker enemies; each difficulty has 2, 4, 6, or 8 enemies in each surface section.
+2. You start with **0 berries**. Defeated pirates leave berry pickups and have a **50% chance** to drop a Log Pose; move close to collect either item. Berry rewards are about **15% higher** than before.
+3. Chests must be opened with **E** when nearby, provide health, energy, and berries, and return after 40 seconds. Chests appear in every surface section and in the Empty Throne realm.
+4. Cross five surface sections, collecting Log Poses to open the guarded gates. Enter the Gold Key portal in section 2 to fight three stronger, non-respawning guardians in their own realm; each drops one Gold Key. Regular enemies and chests do not drop Gold Keys. Use all three keys to open the Secret Poneglyph Vault and claim Gear 5.
+5. Spend berries at the armory and forge. Armory weapons cost **15, 28, 45, and 68 berries**; rarity upgrades cost **23, 45, 80, then 140 berries**. Armory listings show weapon damage, ammo capacity, and energy cost; the currently selected weapon is highlighted.
+6. Press **B** to return to base from anywhere, spending one Log Pose. Pirates cannot attack and weapons cannot be fired while you are on the full brown harbor pad.
+7. Pirates return at their defeat location after **3 minutes**. Enemy firing rates are 30% lower, and all enemies—including bosses—deal 50% less damage than before. All weapons take **3 seconds** to reload; energy regenerates at **1 point per second**, and each shot costs 1 energy. Enemy health and damage scale with difficulty.
+8. Use the portal in section 5 to reach IMU's separate Empty Throne realm. Defeat the boss, return through the portal, then interact with the ship to win.
 
 ## Controls
 
 - **Move Luffy:** `W` `A` `S` `D` or Arrow Keys
-- **Aim & Attack:** Mouse Cursor + `Left Click`
+- **Aim & Attack:** Mouse Cursor + `Left Click` *(each shot costs 1 Energy)*
 - **Gum-Gum Rocket Dash:** `Space` or `Shift` *(costs 25 Energy; grants brief invulnerability; energy regenerates at 1 per second)*
-- **Open Chests / Unlock Gates / Use Armory, Forge, Portals & Thousand Sunny:** `E` (stand close)
+- **Open Chests / Unlock Gates / Use Armory, Forge & Thousand Sunny:** `E` (stand close)
+- **Return to Base:** `B` *(costs 1 Green Log Pose)*
+- **Portals:** press `E` at the section 2 portal to enter the Gold Key realm, or at the section 5 portal to enter the Empty Throne realm. Each realm has a return portal.
+- **Gear 5:** claim the vault reward with `E` to increase player damage by 40%, raise maximum health to 150, and regenerate 2 energy per second. It is an upgrade, not a weapon.
+- **Pause / Resume:** `P` *(the pause screen also lets you return home)*
+- **Instructions:** `I`
 - **Reload Weapon:** `R`
-- **Switch Weapons (Slots 1–6):** Number Keys `1`–`6`
-- **Toggle Live Collision Hitboxes:** `H`
+- **Switch Weapons (Slots 1–5):** Number Keys `1`–`5`

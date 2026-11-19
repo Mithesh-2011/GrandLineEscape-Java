@@ -57,7 +57,7 @@ public class RarityChest {
     }
 
     public int getBerryReward() {
-        int[] values = {1, 2, 4, 7, 12};
+        int[] values = {1, 2, 5, 8, 14};
         return values[rarityIndex];
     }
 

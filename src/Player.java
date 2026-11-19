@@ -13,6 +13,7 @@ public class Player {
     private int berries;
     private int greenLogPoses;
     private int goldKeycards;
+    private boolean gear5Active;
     private double aimAngle;
     private double walkBob;
 
@@ -37,6 +38,7 @@ public class Player {
         this.berries = 0;
         this.greenLogPoses = 0;
         this.goldKeycards = 0;
+        this.gear5Active = false;
         this.aimAngle = 0.0;
         this.walkBob = 0.0;
         this.dashTimer = 0.0;
@@ -75,29 +77,33 @@ public class Player {
 
     private void initializeArsenal() {
         weapons.clear();
-        weapons.add(new Weapon("pistol", "Gomu-Gomu Pistol", "Standard", "👊", 0,
+        weapons.add(new Weapon("pistol", "Gomu-Gomu Pistol", "Standard", "FIST", 0,
                 12, 3.0, 0.22, 24, 740, 8, 0.85, 0.0, 1, false,
                 "#fbbf24", "Fast rubber punch volley. Starter weapon.", true));
 
-        weapons.add(new Weapon("kabuto", "Kabuto Launcher", "Ranged", "🏹", 35,
+        weapons.add(new Weapon("kabuto", "Kabuto Launcher", "Ranged", "BOW", 15,
                 5, 3.0, 0.38, 58, 860, 10, 1.05, 0.0, 1, false,
                 "#f97316", "High-velocity Firebird Star with heavy single-target impact.", false));
 
-        weapons.add(new Weapon("bento", "Diable Bento Launcher", "Blaze", "🔥", 65,
+        weapons.add(new Weapon("bento", "Diable Bento Launcher", "Blaze", "FIRE", 28,
                 12, 3.0, 0.44, 28, 640, 9, 0.75, 0.24, 3, false,
                 "#ef4444", "Launches a 3-way blazing spread of spicy projectiles.", false));
 
-        weapons.add(new Weapon("opeorb", "Ope-Ope Room Orb", "Room", "💠", 105,
+        weapons.add(new Weapon("opeorb", "Ope-Ope Room Orb", "Room", "ORB", 45,
                 1, 3.0, 0.65, 115, 340, 26, 2.10, 0.0, 1, true,
                 "#38bdf8", "Massive piercing ROOM sphere that slices through pirate squads.", false));
 
-        weapons.add(new Weapon("radical", "Radical Laser Beam", "Laser", "⚡", 160,
+        weapons.add(new Weapon("radical", "Radical Laser Beam", "Laser", "LASER", 68,
                 4, 3.0, 0.30, 88, 1120, 11, 1.15, 0.0, 1, true,
                 "#22d3ee", "Super-fast piercing laser beam that melts armored Admirals.", false));
 
-        weapons.add(new Weapon("haki_rod", "Conqueror's Haki Rod", "Secret Wooden Wand", "🔱", -1,
-                28, 3.0, 0.11, 46, 920, 10, 1.05, 0.06, 1, true,
-                "#e11d48", "SECRET VAULT REWARD: Rapid-fire crimson-black Conqueror's Haki bolts!", false));
+    }
+
+    public void activateGear5() {
+        if (gear5Active) return;
+        gear5Active = true;
+        maxHp = 150.0;
+        hp = Math.min(maxHp, hp + 50.0);
     }
 
     public boolean tryDash(double inputDx, double inputDy) {
@@ -121,8 +127,9 @@ public class Player {
     }
 
     public void applyChestRewards(int hpGain, int energyGain, int berryGain, boolean overhealBonus) {
-        if (overhealBonus && maxHp < 160.0) {
-            maxHp = Math.min(160.0, maxHp + 15.0);
+        double hpLimit = gear5Active ? 150.0 : 160.0;
+        if (overhealBonus && maxHp < hpLimit) {
+            maxHp = Math.min(hpLimit, maxHp + 15.0);
         }
         hp = Math.min(maxHp, hp + Math.max(0, hpGain));
         energy = Math.min(maxEnergy, energy + Math.max(0, energyGain));
@@ -191,6 +198,11 @@ public class Player {
         berries -= amount;
         return true;
     }
+    public boolean consumeEnergy(double amount) {
+        if (amount < 0.0 || energy < amount) return false;
+        energy -= amount;
+        return true;
+    }
     public void addGreenLogPoses(int amount) { if (amount > 0) greenLogPoses += amount; }
     public void spendGreenLogPoses(int amount) { greenLogPoses = Math.max(0, greenLogPoses - amount); }
     public void addGoldKeycard() { goldKeycards = Math.min(3, goldKeycards + 1); }
@@ -198,7 +210,9 @@ public class Player {
 
     public void setPosition(double nx, double ny) { this.x = nx; this.y = ny; }
     public void setAimAngle(double angle) { this.aimAngle = angle; }
-    public void regeneratePassiveEnergy(double dt) { energy = Math.min(maxEnergy, energy + dt); }
+    public void regeneratePassiveEnergy(double dt) {
+        energy = Math.min(maxEnergy, energy + dt * (gear5Active ? 2.0 : 1.0));
+    }
     public void tickTimers(double dt) {
         if (dashTimer > 0) dashTimer = Math.max(0, dashTimer - dt);
         if (dashCooldown > 0) dashCooldown = Math.max(0, dashCooldown - dt);
@@ -221,6 +235,8 @@ public class Player {
     public int getBerries() { return berries; }
     public int getGreenLogPoses() { return greenLogPoses; }
     public int getGoldKeycards() { return goldKeycards; }
+    public boolean hasGear5() { return gear5Active; }
+    public double getDamageMultiplier() { return gear5Active ? 1.4 : 1.0; }
     public double getAimAngle() { return aimAngle; }
     public double getWalkBob() { return walkBob; }
     public boolean isDashing() { return dashTimer > 0.0; }

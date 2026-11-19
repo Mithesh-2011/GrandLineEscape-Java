@@ -40,7 +40,7 @@ public class PirateEnemy {
         this.damage = Math.max(1, (int) Math.round(baseDamage * dmgMultiplier));
         this.fireRate = fireRate;
         this.attackRange = attackRange;
-        this.berryDrop = berryDrop;
+        this.berryDrop = berryDrop > 0 ? (int) Math.round(berryDrop * 1.15) : 0;
         this.greenKeyDrop = greenKeyDrop;
         this.goldKeyDrop = goldKeyDrop;
         this.primaryColor = primaryColor;
@@ -122,6 +122,7 @@ public class PirateEnemy {
     public double getRadius() { return radius; }
     public double getSpeed() { return speed; }
     public int getDamage() { return damage; }
+    public double getFireRate() { return fireRate; }
     public double getAttackRange() { return attackRange; }
     public int getBerryDrop() { return berryDrop; }
     public int getGreenKeyDrop() { return greenKeyDrop; }

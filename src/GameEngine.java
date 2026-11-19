@@ -5,27 +5,28 @@ public class GameEngine {
     public static final double ENEMY_RESPAWN_SECONDS = 180.0;
 
     public static final String[] DIFFICULTY_NAMES = {
-        "Easy", "Normal", "Hard", "Expert", "Ludicrous"
+        "Easy", "Normal", "Hard", "Expert"
     };
-    public static final double[] DIFFICULTY_HP_MULT = {0.55, 0.75, 1.20, 2.00, 3.50};
-    public static final double[] DIFFICULTY_DMG_MULT = {0.40, 0.65, 1.20, 2.20, 3.50};
-    public static final int[] DIFFICULTY_GATE_REQ = {1, 2, 3, 4, 5};
+    public static final double[] DIFFICULTY_HP_MULT = {0.35, 0.75, 1.20, 2.00};
+    public static final double[] DIFFICULTY_DMG_MULT = {0.20, 0.325, 0.60, 1.10};
+    public static final int[] DIFFICULTY_GATE_REQ = {1, 2, 3, 4};
     public static final double LOG_POSE_DROP_CHANCE = 0.50;
     private static final int SECRET_VAULT_GOLD_KEY_REQUIREMENT = 3;
+    private static final double ENEMY_FIRE_RATE_MULTIPLIER = 1.0 / 0.70;
+    private static final String MAIN_REALM = "MAIN";
+    private static final String GOLD_KEY_REALM = "GOLD_KEY";
+    private static final String IMU_REALM = "IMU";
 
     private String gameMode;
+    private String currentRealm;
     private int difficultyIndex;
     private double elapsedTime;
-    private boolean showHitboxes;
 
     private int enemiesDefeatedCount;
     private int chestsOpenedCount;
-    private int totalBerriesEarned;
-    private double lowestHpReached;
-    private int highestSingleHitDamage;
     private boolean imuDefeated;
     private boolean secretVaultUnlocked;
-    private boolean secretWeaponClaimed;
+    private boolean gear5Unlocked;
 
     private boolean keyUp, keyDown, keyLeft, keyRight;
     private boolean firingHeld;
@@ -34,7 +35,7 @@ public class GameEngine {
     private Player player;
     private final List<WorldObstacle> walls;
     private final List<SectorGate> gates;
-    private final List<PortalRoute> portalRoutes;
+    private final List<PortalRoute> portals;
     private final List<RarityChest> chests;
     private final List<PirateEnemy> enemies;
     private final List<LootDrop> lootDrops;
@@ -55,10 +56,33 @@ public class GameEngine {
         }
     }
 
+    private static final class PortalRoute {
+        private final String id;
+        private final String name;
+        private final String realm;
+        private final String destinationRealm;
+        private final double x;
+        private final double y;
+        private final double destinationX;
+        private final double destinationY;
+
+        private PortalRoute(String id, String name, String realm, String destinationRealm,
+                            double x, double y, double destinationX, double destinationY) {
+            this.id = id;
+            this.name = name;
+            this.realm = realm;
+            this.destinationRealm = destinationRealm;
+            this.x = x;
+            this.y = y;
+            this.destinationX = destinationX;
+            this.destinationY = destinationY;
+        }
+    }
+
     public GameEngine() {
         this.walls = new ArrayList<>();
         this.gates = new ArrayList<>();
-        this.portalRoutes = new ArrayList<>();
+        this.portals = new ArrayList<>();
         this.chests = new ArrayList<>();
         this.enemies = new ArrayList<>();
         this.lootDrops = new ArrayList<>();
@@ -67,7 +91,6 @@ public class GameEngine {
         this.recentEvents = new ArrayList<>();
         this.pendingEnemyRespawns = new ArrayList<>();
         this.difficultyIndex = 1;
-        this.showHitboxes = false;
         resetGame("Normal", "Monkey D. Luffy");
         this.gameMode = "START";
     }
@@ -75,16 +98,14 @@ public class GameEngine {
     public synchronized void resetGame(String difficultyName, String captainName) {
         this.difficultyIndex = resolveDifficultyIndex(difficultyName);
         this.gameMode = "PLAYING";
+        this.currentRealm = MAIN_REALM;
         this.elapsedTime = 0.0;
 
         this.enemiesDefeatedCount = 0;
         this.chestsOpenedCount = 0;
-        this.totalBerriesEarned = 0;
-        this.lowestHpReached = 100.0;
-        this.highestSingleHitDamage = 0;
         this.imuDefeated = false;
         this.secretVaultUnlocked = false;
-        this.secretWeaponClaimed = false;
+        this.gear5Unlocked = false;
 
         this.keyUp = false;
         this.keyDown = false;
@@ -95,7 +116,7 @@ public class GameEngine {
 
         this.walls.clear();
         this.gates.clear();
-        this.portalRoutes.clear();
+        this.portals.clear();
         this.chests.clear();
         this.enemies.clear();
         this.lootDrops.clear();
@@ -186,44 +207,56 @@ public class GameEngine {
         walls.add(new WorldObstacle(4630, 700, 74, 62, "obsidian"));
         walls.add(new WorldObstacle(5250, 1940, 80, 68, "obsidian"));
 
-        walls.add(new WorldObstacle(1200, 2700, 1200, 42, "throne_wall"));
-        walls.add(new WorldObstacle(1200, 3610, 1200, 42, "throne_wall"));
-        walls.add(new WorldObstacle(1200, 2700, 42, 952, "throne_wall"));
-        walls.add(new WorldObstacle(2358, 2700, 42, 952, "throne_wall"));
-        walls.add(new WorldObstacle(1460, 3020, 56, 56, "pillar"));
-        walls.add(new WorldObstacle(2084, 3020, 56, 56, "pillar"));
-        walls.add(new WorldObstacle(1460, 3340, 56, 56, "pillar"));
-        walls.add(new WorldObstacle(2084, 3340, 56, 56, "pillar"));
+        addRealmWalls(6500, 600, 1300, 1400, "gold_realm_wall");
+        addRealmWalls(8700, 600, 1900, 1600, "imu_realm_wall");
+        portals.add(new PortalRoute("gold_key_entry", "Gold Key Realm Portal", MAIN_REALM,
+                GOLD_KEY_REALM, 2340, 1800, 7100, 1500));
+        portals.add(new PortalRoute("gold_key_exit", "Return to Section 2", GOLD_KEY_REALM,
+                MAIN_REALM, 7100, 1800, 2340, 1800));
+        portals.add(new PortalRoute("imu_entry", "Empty Throne Portal", MAIN_REALM,
+                IMU_REALM, 5140, 1300, 9300, 1800));
+        portals.add(new PortalRoute("imu_exit", "Return to Section 5", IMU_REALM,
+                MAIN_REALM, 9600, 1900, 5140, 1300));
 
-        chests.add(new RarityChest(840, 1400, 0));
+        chests.add(new RarityChest(700, 1400, 0));
 
-        for (int i = 0; i < 5; i++) {
-            spawnChestAtValidLocation(900, 1680, 560, 2040, RarityChest.rollWeightedRarity());
+        double[][] chestSections = {
+            {900, 1680}, {1810, 2640}, {2730, 3560}, {3630, 4510}, {4560, 5260}
+        };
+        for (int section = 0; section < chestSections.length; section++) {
+            int chestCount = section == 2 ? 6 : 5;
+            for (int i = 0; i < chestCount; i++) {
+                int rarity = section == 4 && Math.random() < 0.20
+                        ? 3 : RarityChest.rollWeightedRarity();
+                spawnChestAtValidLocation(chestSections[section][0], chestSections[section][1],
+                        560, 2040, rarity);
+            }
         }
-        for (int i = 0; i < 6; i++) {
-            spawnChestAtValidLocation(2720, 3530, 720, 2040, RarityChest.rollWeightedRarity());
-        }
-        for (int i = 0; i < 5; i++) {
-            int r = (Math.random() < 0.20) ? 3 : RarityChest.rollWeightedRarity();
-            spawnChestAtValidLocation(4560, 5180, 560, 2040, r);
-        }
-
-        chests.add(new RarityChest(1340, 3440, 3));
-        chests.add(new RarityChest(2260, 3440, 4));
-
-        portalRoutes.add(new PortalRoute("sector1", "Coral Shores", 340, 1080, 1600, 1300, 60));
-        portalRoutes.add(new PortalRoute("sector2", "Windward Keys", 430, 1080, 2200, 1300, 100));
-        portalRoutes.add(new PortalRoute("sector3", "Poneglyph Jungle", 520, 1080, 3120, 1300, 160));
-        portalRoutes.add(new PortalRoute("sector4", "Cinder Coast", 610, 1080, 4070, 1300, 230));
-        portalRoutes.add(new PortalRoute("sector5", "Red-Line Cliffs", 700, 1080, 4960, 1300, 320));
 
         spawnPirates(gateReq, hpMult, dmgMult);
+        addEnemy("gold_guardian", "Gold Key Guardian I", 6770, 980, 30, 620, 120, 34, 1.35,
+                390, 35, 0, 1, "#8b5a16", "#facc15", false, hpMult, dmgMult);
+        addEnemy("gold_guardian", "Gold Key Guardian II", 7310, 1280, 34, 780, 112, 42, 1.20,
+                430, 42, 0, 1, "#6f4514", "#fde047", false, hpMult, dmgMult);
+        addEnemy("gold_guardian", "Gold Key Guardian III", 7570, 850, 38, 960, 102, 52, 1.05,
+                470, 50, 0, 1, "#5b3712", "#fbbf24", false, hpMult, dmgMult);
+        addEnemy("imu", "IMU — Sovereign of the Empty Throne", 9800, 1080, 46, 2400,
+                118, 34, 1.35, 680, 150, 0, 0, "#090d16", "#e11d48", true, hpMult, dmgMult);
+        chests.add(new RarityChest(9250, 1550, 3));
+        chests.add(new RarityChest(10300, 1550, 4));
 
         int laserDmg = (int) Math.round(28 * dmgMult);
         lasers.add(new SkyLaser(4660, 520, 4660, 2080, 3.6, 0.4, 1.3, 0.85, 26, false, laserDmg));
         lasers.add(new SkyLaser(4860, 520, 4860, 2080, 3.6, 1.6, 1.3, 0.85, 26, false, laserDmg));
         lasers.add(new SkyLaser(5020, 520, 5020, 2080, 3.6, 2.8, 1.3, 0.85, 26, false, laserDmg));
         lasers.add(new SkyLaser(4560, 1300, 5220, 1300, 4.2, 1.1, 1.4, 0.90, 24, false, laserDmg));
+    }
+
+    private void addRealmWalls(double x, double y, double width, double height, String type) {
+        walls.add(new WorldObstacle(x, y, width, 40, type));
+        walls.add(new WorldObstacle(x, y + height - 40, width, 40, type));
+        walls.add(new WorldObstacle(x, y, 40, height, type));
+        walls.add(new WorldObstacle(x + width - 40, y, 40, height, type));
     }
 
     private void addSectorBarrier(double x) {
@@ -238,39 +271,39 @@ public class GameEngine {
     }
 
     private void spawnChestAtValidLocation(double minX, double maxX, double minY, double maxY, int rarityIdx) {
-        int attempts = 0;
-        boolean placed = false;
-        while (!placed && attempts < 30) {
-            attempts++;
+        for (int attempts = 0; attempts < 60; attempts++) {
             double cx = minX + Math.random() * (maxX - minX);
             double cy = minY + Math.random() * (maxY - minY);
-
-            if (cx > 2040 && cx < 2400 && cy < 700) {
-                continue;
-            }
-
-            boolean blocked = false;
-            for (PortalRoute route : portalRoutes) {
-                if (Math.hypot(cx - route.getDockX(), cy - route.getDockY()) < 130.0
-                        || Math.hypot(cx - route.getDestinationX(), cy - route.getDestinationY()) < 130.0) {
-                    blocked = true;
-                    break;
-                }
-            }
-            for (int i = 0; i < walls.size(); i++) {
-                if (blocked) break;
-                WorldObstacle w = walls.get(i);
-                if (cx + 36 > w.getX() && cx - 36 < w.getX() + w.getWidth() &&
-                    cy + 36 > w.getY() && cy - 36 < w.getY() + w.getHeight()) {
-                    blocked = true;
-                    break;
-                }
-            }
-            if (!blocked) {
+            if (isChestLocationAvailable(cx, cy)) {
                 chests.add(new RarityChest(cx, cy, rarityIdx));
-                placed = true;
+                return;
             }
         }
+
+        for (double cy = minY + 36; cy <= maxY - 36; cy += 72) {
+            for (double cx = minX + 36; cx <= maxX - 36; cx += 72) {
+                if (isChestLocationAvailable(cx, cy)) {
+                    chests.add(new RarityChest(cx, cy, rarityIdx));
+                    return;
+                }
+            }
+        }
+        throw new IllegalStateException("Unable to find a valid chest location in the requested area");
+    }
+
+    private boolean isChestLocationAvailable(double cx, double cy) {
+        for (RarityChest chest : chests) {
+            if (Math.hypot(cx - chest.getX(), cy - chest.getY()) < 76.0) {
+                return false;
+            }
+        }
+        for (WorldObstacle wall : walls) {
+            if (cx + 36 > wall.getX() && cx - 36 < wall.getX() + wall.getWidth()
+                    && cy + 36 > wall.getY() && cy - 36 < wall.getY() + wall.getHeight()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void spawnPirates(int gateReq, double hpMult, double dmgMult) {
@@ -311,17 +344,16 @@ public class GameEngine {
         ensureSectionEnemyCount(1778, 2690, gateReq * 2, hpMult, dmgMult,
                 new double[][] {{1840, 700}, {2020, 1860}, {2220, 740}, {2500, 1860}, {2600, 980},
                         {1830, 1780}, {2260, 1880}, {2600, 740}, {2500, 980}});
-        ensureSectionEnemyCount(2728, 3590, (gateReq + 1) * 2, hpMult, dmgMult,
+        ensureSectionEnemyCount(2728, 3590, gateReq * 2, hpMult, dmgMult,
                 new double[][] {{2760, 740}, {2880, 1900}, {3060, 760}, {3400, 1880},
                         {3500, 760}, {2780, 1840}, {3440, 980}});
-        ensureSectionEnemyCount(3628, 4540, (gateReq + 1) * 2, hpMult, dmgMult,
+        ensureSectionEnemyCount(3628, 4540, gateReq * 2, hpMult, dmgMult,
                 new double[][] {{3680, 720}, {3860, 1880}, {4020, 740}, {4200, 1880}, {4480, 740},
                         {3700, 1840}, {3880, 720}, {4100, 1880}, {4300, 740}, {4480, 1880}, {3720, 980}});
-        ensureSectionEnemyCount(4578, 5360, (gateReq + 2) * 2, hpMult, dmgMult,
+        ensureSectionEnemyCount(4578, 5360, gateReq * 2, hpMult, dmgMult,
                 new double[][] {{4620, 740}, {4680, 1880}, {4900, 740}, {5200, 1840}, {5300, 740},
                         {4600, 1840}, {4820, 1880}, {5000, 740}, {5240, 1880}, {5320, 980}});
 
-        addEnemy("imu", "IMU — Sovereign of the Empty Throne", 1800, 2920, 46, 2400, 118, 34, 1.35, 680, 150, 0, 0, "#090d16", "#e11d48", true, hpMult, dmgMult);
     }
 
     private void ensureSectionEnemyCount(double minX, double maxX, int targetCount,
@@ -361,10 +393,12 @@ public class GameEngine {
                           int greenDrop, int goldDrop, String c1, String c2, boolean boss,
                           double hpMult, double dmgMult) {
         int pressure = difficultyIndex;
-        double worldX = boss ? x : mapEnemyX(x);
+        double worldX = boss || "gold_guardian".equals(type) ? x : mapEnemyX(x);
         enemies.add(new PirateEnemy(nextEnemyId++, type, name, worldX, y, radius, hp,
-                speed * 0.85 * (1.0 + pressure * 0.05), dmg, fireRate / (1.15 + pressure * 0.10),
-                range, berries, greenDrop, goldDrop, c1, c2, boss, hpMult, dmgMult));
+                speed * 0.85 * (1.0 + pressure * 0.05), dmg,
+                fireRate / (1.15 + pressure * 0.10) * ENEMY_FIRE_RATE_MULTIPLIER,
+                range, berries, greenDrop, "gold_guardian".equals(type) ? goldDrop : 0,
+                c1, c2, boss, hpMult, dmgMult));
     }
 
     private void addAddedSectorEnemy(String type, String name, double x, double y, double radius,
@@ -373,8 +407,9 @@ public class GameEngine {
                                      double hpMult, double dmgMult) {
         int pressure = difficultyIndex;
         enemies.add(new PirateEnemy(nextEnemyId++, type, name, x, y, radius, hp,
-                speed * 0.85 * (1.0 + pressure * 0.05), dmg, fireRate / (1.15 + pressure * 0.10),
-                range, berries, 0, goldDrop, c1, c2, false, hpMult, dmgMult));
+                speed * 0.85 * (1.0 + pressure * 0.05), dmg,
+                fireRate / (1.15 + pressure * 0.10) * ENEMY_FIRE_RATE_MULTIPLIER,
+                range, berries, 0, 0, c1, c2, false, hpMult, dmgMult));
     }
 
     public synchronized void updateInputState(boolean up, boolean down, boolean left, boolean right,
@@ -383,7 +418,7 @@ public class GameEngine {
         this.keyDown = down;
         this.keyLeft = left;
         this.keyRight = right;
-        this.firingHeld = firing;
+        this.firingHeld = firing && player != null && !isPlayerInSafeHarbor();
         this.inputAimAngle = aimAngle;
         if (player != null) {
             player.setAimAngle(aimAngle);
@@ -395,9 +430,20 @@ public class GameEngine {
             return "INVALID_ACTION";
         }
 
-        if ("TOGGLE_HITBOXES".equals(action)) {
-            showHitboxes = !showHitboxes;
-            return "HITBOXES_" + (showHitboxes ? "ON" : "OFF");
+        if ("PAUSE".equals(action)) {
+            if ("PLAYING".equals(gameMode)) {
+                gameMode = "PAUSED";
+                keyUp = keyDown = keyLeft = keyRight = firingHeld = false;
+                return "PAUSED";
+            }
+            if ("PAUSED".equals(gameMode)) {
+                gameMode = "PLAYING";
+                return "RESUMED";
+            }
+            return "NOT_PLAYING";
+        } else if ("RESUME".equals(action) && "PAUSED".equals(gameMode)) {
+            gameMode = "PLAYING";
+            return "RESUMED";
         }
 
         if (!"PLAYING".equals(gameMode)) {
@@ -405,6 +451,15 @@ public class GameEngine {
         }
 
         if ("FIRE".equals(action)) {
+            if (isPlayerInSafeHarbor()) {
+                return "SAFE_HARBOR";
+            }
+            if (player.getEnergy() < Weapon.ENERGY_COST_PER_SHOT
+                    && player.getEquippedWeapon().canFire()) {
+                pushEvent("Need " + (int) Weapon.ENERGY_COST_PER_SHOT + " Energy to fire",
+                        "#38bdf8", player.getX(), player.getY() - 26);
+                return "LOW_ENERGY";
+            }
             fireEquippedWeapon();
             return "FIRED";
         } else if ("DASH".equals(action)) {
@@ -438,32 +493,36 @@ public class GameEngine {
             return "CANNOT_UPGRADE";
         } else if ("INTERACT".equals(action)) {
             return handleInteract();
+        } else if ("RETURN_TO_BASE".equals(action)) {
+            if (isPlayerInSafeHarbor()) {
+                return "ALREADY_AT_BASE";
+            }
+            if (player.getGreenLogPoses() < 1) {
+                pushEvent("Need 1 Green Log Pose to return to base",
+                        "#86efac", player.getX(), player.getY() - 26);
+                return "NO_LOG_POSE";
+            }
+            player.spendGreenLogPoses(1);
+            currentRealm = MAIN_REALM;
+            player.setPosition(500, 1300);
+            projectiles.clear();
+            lasers.clear();
+            pushEvent("Returned to base. 1 Log Pose spent.", "#86efac", player.getX(), player.getY() - 26);
+            return "RETURNED_TO_BASE";
         }
         return "UNKNOWN_ACTION";
     }
 
     private String handleInteract() {
-        for (PortalRoute route : portalRoutes) {
-            if (!route.isNear(player.getX(), player.getY())) continue;
-            if (!route.isUnlocked()) {
-                if (!player.spendBerries(route.getBerryCost())) {
-                    pushEvent("Need " + route.getBerryCost() + " berries to unlock " + route.getName(),
-                            "#fbbf24", player.getX(), player.getY() - 24);
-                    return "PORTAL_CANNOT_AFFORD";
-                }
-                route.unlock();
-                pushEvent(route.getName() + " PORTAL UNLOCKED", "#fbbf24",
-                        player.getX(), player.getY() - 24);
-                return "PORTAL_UNLOCKED";
+        for (PortalRoute portal : portals) {
+            if (portal.realm.equals(currentRealm) && player.distanceTo(portal.x, portal.y) <= 92.0) {
+                currentRealm = portal.destinationRealm;
+                player.setPosition(portal.destinationX, portal.destinationY);
+                projectiles.clear();
+                lasers.clear();
+                pushEvent("Entered " + portal.name, "#a78bfa", player.getX(), player.getY() - 28);
+                return "PORTAL_TRAVELLED";
             }
-            if (route.isAtDock(player.getX(), player.getY())) {
-                player.setPosition(route.getDestinationX(), route.getDestinationY());
-            } else {
-                player.setPosition(route.getDockX(), route.getDockY());
-            }
-            pushEvent("TRAVELED VIA " + route.getName().toUpperCase(), "#fbbf24",
-                    player.getX(), player.getY() - 24);
-            return "WARPED";
         }
 
         for (int i = 0; i < chests.size(); i++) {
@@ -497,40 +556,20 @@ public class GameEngine {
             }
         }
 
-        if (!secretWeaponClaimed && player.distanceTo(3120, 540) <= 78.0) {
+        if (!gear5Unlocked && player.distanceTo(3120, 540) <= 78.0) {
             if (!secretVaultUnlocked) {
                 pushEvent("Unlock the Secret Poneglyph Vault with 3 Gold Keys first!",
                         "#fbbf24", 3120, 510);
                 return "SECRET_LOCKED";
             }
-            secretWeaponClaimed = true;
-            Weapon hakiRod = player.getWeapons().get(5);
-            hakiRod.unlockWithRarity(3);
-            player.selectWeaponSlot(5);
-            pushEvent("ACQUIRED: CONQUEROR'S HAKI ROD!", "#f43f5e", 3120, 510);
+            gear5Unlocked = true;
+            player.activateGear5();
+            pushEvent("GEAR 5 AWAKENED! +40% DAMAGE, 150 MAX HP, 2 ENERGY/SEC",
+                    "#f43f5e", 3120, 510);
             return "SECRET_CLAIMED";
         }
 
-        int throneReq = DIFFICULTY_GATE_REQ[difficultyIndex] + 2;
-        if (player.distanceTo(5120, 1300) <= 90.0) {
-            if (player.getGreenLogPoses() >= throneReq) {
-                player.spendGreenLogPoses(throneReq);
-                player.setPosition(1800, 3480);
-                pushEvent("ENTERED THE EMPTY THRONE!", "#fb7185", 1800, 3420);
-                return "ENTERED_THRONE";
-            } else {
-                pushEvent("Need " + throneReq + " Green Log Poses!", "#f87171", 5120, 1265);
-                return "PORTAL_LOCKED";
-            }
-        }
-
-        if (imuDefeated && player.distanceTo(1800, 3480) <= 86.0) {
-            player.setPosition(500, 1300);
-            pushEvent("BOARD THE THOUSAND SUNNY TO ESCAPE!", "#fbbf24", 500, 1265);
-            return "RETURNED_HARBOR";
-        }
-
-        if (player.distanceTo(375, 1300) <= 104.0) {
+        if (MAIN_REALM.equals(currentRealm) && player.distanceTo(375, 1300) <= 104.0) {
             if (imuDefeated) {
                 gameMode = "VICTORY";
                 pushEvent("GRAND LINE ESCAPED! VICTORY!", "#fbbf24", 375, 1240);
@@ -553,8 +592,6 @@ public class GameEngine {
         int berryGain = c.getBerryReward();
 
         player.applyChestRewards(hpGain, enGain, berryGain, idx == 4);
-        totalBerriesEarned += berryGain;
-
         String rarityName = Weapon.RARITY_NAMES[idx];
         String rarityColor = Weapon.RARITY_COLORS[idx];
         StringBuilder sb = new StringBuilder();
@@ -564,25 +601,26 @@ public class GameEngine {
             player.addGreenLogPoses(1);
             sb.append("  +1 LogPose");
         }
-        if (idx == 4 && Math.random() < 0.55) {
-            player.addGoldKeycard();
-            sb.append("  +1 GoldKey");
-        }
-
         pushEvent(rarityName.toUpperCase() + " CHEST! " + sb.toString(), rarityColor, c.getX(), c.getY() - 22);
     }
 
-    private void fireEquippedWeapon() {
+    private boolean fireEquippedWeapon() {
+        if (isPlayerInSafeHarbor()) {
+            return false;
+        }
         Weapon w = player.getEquippedWeapon();
         if (!w.canFire()) {
             if (w.isUnlocked() && !w.isReloading() && w.getCurrentAmmo() <= 0) {
                 w.startReload();
             }
-            return;
+            return false;
+        }
+        if (!player.consumeEnergy(Weapon.ENERGY_COST_PER_SHOT)) {
+            return false;
         }
 
         w.consumeShot();
-        int scaledDmg = w.getScaledDamage();
+        int scaledDmg = (int) Math.round(w.getScaledDamage() * player.getDamageMultiplier());
         double muzzleDist = player.getRadius() + 12.0;
         double mx = player.getX() + Math.cos(player.getAimAngle()) * muzzleDist;
         double my = player.getY() + Math.sin(player.getAimAngle()) * muzzleDist;
@@ -604,6 +642,7 @@ public class GameEngine {
                     w.getRarityColor()
             ));
         }
+        return true;
     }
 
     public synchronized void tick(double dt) {
@@ -615,7 +654,7 @@ public class GameEngine {
         player.regeneratePassiveEnergy(dt);
         player.tickTimers(dt);
 
-        if (firingHeld) {
+        if (firingHeld && !isPlayerInSafeHarbor()) {
             fireEquippedWeapon();
         }
 
@@ -666,11 +705,13 @@ public class GameEngine {
             }
             if (drop.isBerry()) {
                 player.addBerries(drop.getAmount());
-                totalBerriesEarned += drop.getAmount();
                 pushEvent("+B" + drop.getAmount(), "#fbbf24", drop.getX(), drop.getY() - 16);
-            } else {
+            } else if ("LOG_POSE".equals(drop.getType())) {
                 player.addGreenLogPoses(drop.getAmount());
                 pushEvent("+" + drop.getAmount() + " LOG POSE", "#86efac", drop.getX(), drop.getY() - 16);
+            } else if ("GOLD_KEY".equals(drop.getType())) {
+                player.addGoldKeycard();
+                pushEvent("+1 GOLD KEY", "#facc15", drop.getX(), drop.getY() - 16);
             }
             lootDrops.remove(i);
         }
@@ -736,17 +777,15 @@ public class GameEngine {
     }
 
     private void updateEnemies(double dt) {
-        boolean playerInThrone = player.getY() > 2500.0;
-
         for (int i = 0; i < enemies.size(); i++) {
             PirateEnemy en = enemies.get(i);
             if (!en.isAlive()) {
                 continue;
             }
-            if (en.isBoss() && !playerInThrone) {
+            if (!isEnemyInCurrentRealm(en)) {
                 continue;
             }
-            if (!en.isBoss() && playerInThrone && en.getY() < 2500.0) {
+            if (isPlayerInSafeHarbor()) {
                 continue;
             }
 
@@ -809,13 +848,24 @@ public class GameEngine {
         }
     }
 
+    private boolean isEnemyInCurrentRealm(PirateEnemy enemy) {
+        if (GOLD_KEY_REALM.equals(currentRealm)) {
+            return "gold_guardian".equals(enemy.getType());
+        }
+        if (IMU_REALM.equals(currentRealm)) {
+            return enemy.isBoss();
+        }
+        return !enemy.isBoss() && !"gold_guardian".equals(enemy.getType());
+    }
+
     private void updateProjectiles(double dt) {
         int i = 0;
         while (i < projectiles.size()) {
             Projectile pr = projectiles.get(i);
             pr.update(dt);
 
-            if (pr.isExpired() || hitsAnyWallOrClosedGate(pr.getX(), pr.getY())) {
+            if (pr.isExpired() || hitsAnyWallOrClosedGate(pr.getX(), pr.getY())
+                    || (pr.isFromPlayer() && isPlayerInSafeHarbor())) {
                 projectiles.remove(i);
                 continue;
             }
@@ -824,15 +874,12 @@ public class GameEngine {
             if (pr.isFromPlayer()) {
                 for (int j = 0; j < enemies.size(); j++) {
                     PirateEnemy en = enemies.get(j);
-                    if (!en.isAlive() || pr.hasAlreadyHit(en.getId())) {
+                    if (!en.isAlive() || !isEnemyInCurrentRealm(en) || pr.hasAlreadyHit(en.getId())) {
                         continue;
                     }
                     double dist = Math.hypot(pr.getX() - en.getX(), pr.getY() - en.getY());
                     if (dist < pr.getRadius() + en.getRadius()) {
                         en.takeDamage(pr.getDamage());
-                        if (pr.getDamage() > highestSingleHitDamage) {
-                            highestSingleHitDamage = pr.getDamage();
-                        }
                         pushEvent("-" + pr.getDamage(), "#fde047", en.getX(), en.getY() - en.getRadius() - 8);
 
                         if (!en.isAlive()) {
@@ -849,6 +896,10 @@ public class GameEngine {
                     }
                 }
             } else {
+                if (isPlayerInSafeHarbor()) {
+                    projectiles.remove(i);
+                    continue;
+                }
                 double dist = Math.hypot(pr.getX() - player.getX(), pr.getY() - player.getY());
                 if (dist < pr.getRadius() + player.getRadius() - 3.0) {
                     applyDamageToPlayer(pr.getDamage());
@@ -888,7 +939,8 @@ public class GameEngine {
         if (en.getBerryDrop() > 0) {
             lootDrops.add(new LootDrop("BERRY", en.getX() - 12, en.getY() + 8, en.getBerryDrop()));
         }
-        boolean logPoseDropped = shouldDropLogPose(logPoseRoll)
+        boolean logPoseDropped = en.isBoss()
+                || shouldDropLogPose(logPoseRoll)
                 || shouldGuaranteeLogPose(en);
         if (logPoseDropped) {
             lootDrops.add(new LootDrop("LOG_POSE", en.getX() + 14, en.getY() + 8, 1));
@@ -901,15 +953,14 @@ public class GameEngine {
             return;
         }
 
-        pendingEnemyRespawns.add(new PendingEnemyRespawn(en, ENEMY_RESPAWN_SECONDS));
-        int goldKeysAwarded = getGuaranteedGoldKeyAward(en);
-        for (int i = 0; i < goldKeysAwarded; i++) {
-            player.addGoldKeycard();
+        if (en.getGoldKeyDrop() > 0) {
+            lootDrops.add(new LootDrop("GOLD_KEY", en.getX() + 14, en.getY() + 8, 1));
+        } else {
+            pendingEnemyRespawns.add(new PendingEnemyRespawn(en, ENEMY_RESPAWN_SECONDS));
         }
         String rewardMsg = (en.getBerryDrop() > 0 ? "BERRIES DROPPED" : "")
                 + (logPoseDropped ? "  LOG POSE DROPPED" : "")
-                + (goldKeysAwarded > 0 ? "  +" + goldKeysAwarded
-                        + (goldKeysAwarded == 1 ? " GOLD KEY!" : " GOLD KEYS!") : "");
+                + (en.getGoldKeyDrop() > 0 ? "  GOLD KEY DROPPED!" : "");
         if (!rewardMsg.isEmpty()) {
             pushEvent(rewardMsg, "#34d399", en.getX(), en.getY() - 20);
         }
@@ -944,6 +995,7 @@ public class GameEngine {
                 for (PirateEnemy enemy : enemies) {
                     if (enemy != defeatedEnemy && enemy.isAlive()
                             && !enemy.isBoss()
+                            && enemy.getGoldKeyDrop() == 0
                             && enemy.getX() >= sectionStart
                             && enemy.getX() < sectionEnd) {
                         remainingEnemies++;
@@ -954,24 +1006,6 @@ public class GameEngine {
             sectionStart = sectionEnd;
         }
         return false;
-    }
-
-    private int getGuaranteedGoldKeyAward(PirateEnemy defeatedEnemy) {
-        int keyCount = player.getGoldKeycards();
-        if (secretVaultUnlocked || keyCount >= SECRET_VAULT_GOLD_KEY_REQUIREMENT) {
-            return Math.min(defeatedEnemy.getGoldKeyDrop(),
-                    SECRET_VAULT_GOLD_KEY_REQUIREMENT - keyCount);
-        }
-
-        int missingKeys = SECRET_VAULT_GOLD_KEY_REQUIREMENT - keyCount;
-        int keysAlreadyAwarded = Math.min(defeatedEnemy.getGoldKeyDrop(), missingKeys);
-        int futureGuaranteedKeys = 0;
-        for (PirateEnemy enemy : enemies) {
-            if (enemy != defeatedEnemy && enemy.isAlive() && !enemy.isBoss()) {
-                futureGuaranteedKeys += enemy.getGoldKeyDrop();
-            }
-        }
-        return Math.min(missingKeys, Math.max(keysAlreadyAwarded, missingKeys - futureGuaranteedKeys));
     }
 
     static boolean shouldDropLogPose(double roll) {
@@ -997,11 +1031,13 @@ public class GameEngine {
         }
     }
 
+    private boolean isPlayerInSafeHarbor() {
+        return player.getX() >= 310.0 && player.getX() <= 790.0
+                && player.getY() >= 1000.0 && player.getY() <= 1600.0;
+    }
+
     private void applyDamageToPlayer(int damage) {
-        if (player.takeDamage(damage)) {
-            if (player.getHp() < lowestHpReached) {
-                lowestHpReached = player.getHp();
-            }
+        if (!isPlayerInSafeHarbor() && player.takeDamage(damage)) {
             pushEvent("-" + damage + " HP", "#f87171", player.getX(), player.getY() - 26);
             if (player.getHp() <= 0.0) {
                 gameMode = "DEFEAT";
@@ -1012,8 +1048,10 @@ public class GameEngine {
 
     public String getCurrentZoneSummary() {
         String rawCode;
-        if (player.getY() > 2500.0) {
-            rawCode = "ZONE 4:THE EMPTY THRONE";
+        if (GOLD_KEY_REALM.equals(currentRealm)) {
+            rawCode = "REALM:GOLD KEY ARENA";
+        } else if (IMU_REALM.equals(currentRealm)) {
+            rawCode = "REALM:THE EMPTY THRONE";
         } else if (player.getX() < 850.0) {
             rawCode = "ZONE 0:SAFE HARBOR DOCK";
         } else if (player.getX() < 1755.0) {
@@ -1053,20 +1091,17 @@ public class GameEngine {
         sb.append("\"mode\":\"").append(gameMode).append("\",");
         sb.append("\"difficulty\":\"").append(DIFFICULTY_NAMES[difficultyIndex]).append("\",");
         sb.append("\"difficultyIndex\":").append(difficultyIndex).append(",");
+        sb.append("\"realm\":\"").append(currentRealm).append("\",");
         sb.append("\"gateReq\":").append(DIFFICULTY_GATE_REQ[difficultyIndex]).append(",");
         sb.append("\"elapsedTime\":").append(String.format(java.util.Locale.US, "%.2f", elapsedTime)).append(",");
-        sb.append("\"showHitboxes\":").append(showHitboxes).append(",");
         sb.append("\"zoneLabel\":\"").append(escapeJson(getCurrentZoneSummary())).append("\",");
         sb.append("\"imuDefeated\":").append(imuDefeated).append(",");
         sb.append("\"secretVaultUnlocked\":").append(secretVaultUnlocked).append(",");
-        sb.append("\"secretWeaponClaimed\":").append(secretWeaponClaimed).append(",");
+        sb.append("\"gear5Unlocked\":").append(gear5Unlocked).append(",");
 
         sb.append("\"metrics\":{");
         sb.append("\"kills\":").append(enemiesDefeatedCount).append(",");
-        sb.append("\"chestsOpened\":").append(chestsOpenedCount).append(",");
-        sb.append("\"totalBerriesEarned\":").append(totalBerriesEarned).append(",");
-        sb.append("\"lowestHpReached\":").append(Math.round(lowestHpReached)).append(",");
-        sb.append("\"highestSingleHit\":").append(highestSingleHitDamage);
+        sb.append("\"chestsOpened\":").append(chestsOpenedCount);
         sb.append("},");
 
         sb.append("\"player\":{");
@@ -1081,6 +1116,7 @@ public class GameEngine {
         sb.append("\"berries\":").append(player.getBerries()).append(",");
         sb.append("\"greenKeys\":").append(player.getGreenLogPoses()).append(",");
         sb.append("\"goldKeys\":").append(player.getGoldKeycards()).append(",");
+        sb.append("\"gear5Active\":").append(player.hasGear5()).append(",");
         sb.append("\"aimAngle\":").append(String.format(java.util.Locale.US, "%.3f", player.getAimAngle())).append(",");
         sb.append("\"walkBob\":").append(String.format(java.util.Locale.US, "%.2f", player.getWalkBob())).append(",");
         sb.append("\"dashing\":").append(player.isDashing()).append(",");
@@ -1096,6 +1132,7 @@ public class GameEngine {
             sb.append("\"gimkitRef\":\"").append(escapeJson(w.getGimkitRef())).append("\",");
             sb.append("\"icon\":\"").append(w.getIcon()).append("\",");
             sb.append("\"cost\":").append(w.getUnlockCost()).append(",");
+            sb.append("\"energyCost\":").append(Weapon.ENERGY_COST_PER_SHOT).append(",");
             sb.append("\"unlocked\":").append(w.isUnlocked()).append(",");
             sb.append("\"rarityIndex\":").append(w.getRarityIndex()).append(",");
             sb.append("\"rarityName\":\"").append(w.getRarityName()).append("\",");
@@ -1135,17 +1172,15 @@ public class GameEngine {
         }
         sb.append("],");
 
-        sb.append("\"portalRoutes\":[");
-        for (int i = 0; i < portalRoutes.size(); i++) {
-            PortalRoute route = portalRoutes.get(i);
-            if (i > 0) sb.append(",");
-            sb.append("{\"id\":\"").append(route.getId()).append("\",\"name\":\"")
-              .append(escapeJson(route.getName())).append("\",\"dockX\":").append(route.getDockX())
-              .append(",\"dockY\":").append(route.getDockY())
-              .append(",\"destinationX\":").append(route.getDestinationX())
-              .append(",\"destinationY\":").append(route.getDestinationY())
-              .append(",\"cost\":").append(route.getBerryCost())
-              .append(",\"unlocked\":").append(route.isUnlocked()).append("}");
+        sb.append("\"portals\":[");
+        boolean firstPortal = true;
+        for (PortalRoute portal : portals) {
+            if (!portal.realm.equals(currentRealm)) continue;
+            if (!firstPortal) sb.append(",");
+            firstPortal = false;
+            sb.append("{\"id\":\"").append(portal.id).append("\",\"name\":\"")
+              .append(escapeJson(portal.name)).append("\",\"x\":").append(portal.x)
+              .append(",\"y\":").append(portal.y).append("}");
         }
         sb.append("],");
 
@@ -1227,9 +1262,10 @@ public class GameEngine {
     public Player getPlayer() { return player; }
     public String getGameMode() { return gameMode; }
     public boolean isImuDefeated() { return imuDefeated; }
+    public String getCurrentRealm() { return currentRealm; }
     List<PirateEnemy> getEnemies() { return enemies; }
     public List<RarityChest> getChests() { return chests; }
     public List<SectorGate> getGates() { return gates; }
     List<LootDrop> getLootDrops() { return lootDrops; }
-    List<PortalRoute> getPortalRoutes() { return portalRoutes; }
+    List<Projectile> getProjectiles() { return projectiles; }
 }

@@ -42,7 +42,7 @@
       background: rgba(45, 28, 25, .95);
       padding: 0 .35rem;
       color: #f5e8df;
-      font: 700 10px 'JetBrains Mono', monospace;
+      font: 700 15px 'JetBrains Mono', monospace;
     }
     #startScreen [class*="text-cyan-"] { color: #fca5a5; }
     #startScreen [class*="border-cyan-"] { border-color: rgba(248, 113, 113, .45); }
@@ -55,7 +55,7 @@
     #hudLayer [class*="text-cyan-"] { color: #fca5a5; }
     #hudLayer [class*="bg-cyan-"] { background-color: rgba(185, 66, 42, .28); }
     #hudLayer [class*="ring-cyan-"] { --tw-ring-color: rgba(248, 113, 113, .48); }
-    #armoryModal > div, #forgeModal > div, #rubricModal > div, #endModal > div {
+    #armoryModal > div, #forgeModal > div, #endModal > div, #pauseModal > div, #instructionsModal > div {
       background-color: #2d1c19;
       border-color: rgba(214, 166, 140, .38);
     }
@@ -190,11 +190,10 @@
       padding: 8px 10px;
     }
     #weaponHotbar button:last-child { border-right: 0 !important; }
-    #weaponHotbar button[style*="border-color"] { background: #492920 !important; }
+    #weaponHotbar button[data-selected="true"] { background: #75402d !important; outline: 2px solid #ffd675; outline-offset: -2px; }
     #weaponHotbar button.opacity-45 { background: #1c120f !important; }
-    #minimapCanvas { border-radius: 0 !important; }
-    #armoryModal, #forgeModal, #rubricModal { backdrop-filter: none !important; }
-    #armoryModal > div, #forgeModal > div, #rubricModal > div {
+    #armoryModal, #forgeModal, #pauseModal, #instructionsModal { backdrop-filter: none !important; }
+    #armoryModal > div, #forgeModal > div, #pauseModal > div, #instructionsModal > div {
       border-width: 1px !important;
       border-radius: 2px !important;
       box-shadow: none !important;
@@ -203,7 +202,7 @@
     }
     #armoryModal > div *,
     #forgeModal > div *,
-    #rubricModal > div * {
+    #pauseModal > div *, #instructionsModal > div * {
       border-radius: 2px !important;
       box-shadow: none !important;
       backdrop-filter: none !important;
@@ -225,7 +224,7 @@
       padding: 14px;
     }
     #armoryItemsGrid button, #forgeItemsGrid button,
-    #btnCloseArmory, #btnCloseForge, #btnCloseRubric {
+    #btnCloseArmory, #btnCloseForge, #btnCloseInstructions {
       border-radius: 2px !important;
       box-shadow: none !important;
     }
@@ -449,11 +448,11 @@
       background: rgba(112, 24, 18, .96) !important;
     }
     #weaponHotbar button { border: 0 !important; }
-    #weaponHotbar button[style*="border-color"] { background: #9c2c20 !important; }
+    #weaponHotbar button[data-selected="true"] { background: #9c2c20 !important; }
     #weaponHotbar button.opacity-45 { background: rgba(69, 19, 15, .8) !important; }
-    #armoryModal > div, #forgeModal > div, #rubricModal > div,
+    #armoryModal > div, #forgeModal > div, #pauseModal > div, #instructionsModal > div,
     #armoryItemsGrid > div, #forgeItemsGrid > div,
-    #rubricStatsBody > div, #endModal dl > div {
+    #endModal dl > div {
       border: 0 !important;
     }
 </style>
@@ -463,7 +462,7 @@
   <canvas id="gameCanvas"></canvas>
 
   <div id="serverWarningBanner" class="fixed inset-x-0 top-0 z-50 hidden bg-rose-600 px-4 py-2.5 text-center text-xs font-extrabold text-white shadow-xl">
-    ⚠️ Java Backend Not Connected! Run <code class="rounded bg-slate-950 px-1.5 py-0.5 font-mono-code">run.bat</code> (Windows) or <code class="rounded bg-slate-950 px-1.5 py-0.5 font-mono-code">./run.sh</code> (Mac/Linux), then open <code class="underline">http://localhost:8080</code>.
+    Java backend not connected. Run <code class="rounded bg-slate-950 px-1.5 py-0.5 font-mono-code">run.bat</code> (Windows) or <code class="rounded bg-slate-950 px-1.5 py-0.5 font-mono-code">./run.sh</code> (Mac/Linux), then open <code class="underline">http://localhost:8080</code>.
   </div>
 
   <div id="hudLayer" class="pointer-events-none fixed inset-0 z-10 hidden flex flex-col justify-between p-3 sm:p-4">
@@ -474,7 +473,7 @@
         <div class="flex flex-col gap-1.5 min-w-[165px] sm:min-w-[195px]">
           <div>
             <div class="mb-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide">
-              <span class="text-rose-400">❤️ HEALTH</span>
+              <span class="text-rose-400">HEALTH</span>
               <span id="hudHpText" class="font-mono-code text-slate-200">100 / 100</span>
             </div>
             <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-800 p-0.5 ring-1 ring-slate-700">
@@ -484,7 +483,7 @@
 
           <div>
             <div class="mb-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide">
-              <span class="text-cyan-400">⚡ ENERGY (DASH)</span>
+              <span class="text-cyan-400">ENERGY (WEAPONS / DASH)</span>
               <span id="hudEnergyText" class="font-mono-code text-slate-200">100 / 100</span>
             </div>
             <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-800 p-0.5 ring-1 ring-slate-700">
@@ -507,43 +506,34 @@
       <div class="flex flex-col items-center gap-1.5">
         <div class="pointer-events-auto flex items-center gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/90 px-4 py-2 shadow-xl backdrop-blur-md">
           <div class="flex items-center gap-1.5">
-            <span class="text-sm">⏱️</span>
+            <span class="text-sm">TIME</span>
             <span id="hudTimerText" class="font-mono-code text-base font-bold text-white">00:00.0</span>
           </div>
           <div class="h-5 w-px bg-slate-700"></div>
           <div class="flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1 ring-1 ring-emerald-500/40">
-            <span class="text-sm">🧭</span>
             <span class="text-xs font-bold text-emerald-300">LOG POSES:</span>
             <span id="hudGreenKeysText" class="font-mono-code text-sm font-extrabold text-emerald-400">0</span>
           </div>
           <div class="flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-2.5 py-1 ring-1 ring-amber-500/40">
-            <span class="text-sm">🔑</span>
             <span class="text-xs font-bold text-amber-300">GOLD KEYS:</span>
             <span id="hudGoldKeysText" class="font-mono-code text-sm font-extrabold text-amber-400">0/3</span>
           </div>
+          <span id="gear5HudBadge" class="hidden rounded-lg bg-rose-500/20 px-2.5 py-1 text-xs font-extrabold text-rose-300 ring-1 ring-rose-500/50">GEAR 5 ACTIVE</span>
         </div>
 
         <div class="flex items-center gap-2 rounded-full border border-slate-700/70 bg-slate-950/85 px-3.5 py-1 text-xs font-semibold shadow-md backdrop-blur-sm">
           <span id="hudZoneBadge" class="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-300">ZONE 0 - SAFE HARBOR</span>
-          <span id="hudBackendTag" class="font-mono-code text-[11px] text-emerald-400">● Java 60Hz Sync</span>
+          <span id="hudBackendTag" class="font-mono-code text-[11px] text-emerald-400">Java 60Hz Sync</span>
+          <span class="font-mono-code text-[11px] text-amber-300">B: return to base (1 Log Pose)</span>
         </div>
       </div>
 
       <div class="flex flex-col items-end gap-2">
         <div class="pointer-events-auto flex items-center gap-1.5">
-          <button id="btnToggleHitboxes" class="rounded-xl border border-slate-700 bg-slate-900/90 px-2.5 py-1.5 text-xs font-bold text-slate-300 shadow-lg transition hover:border-emerald-400 hover:text-emerald-300">
-            🎯 Hitboxes [H]
+          <button id="btnOpenInstructions" class="rounded-xl border border-slate-700 bg-slate-900/90 px-2.5 py-1.5 text-xs font-bold text-slate-300 shadow-lg transition hover:border-amber-400 hover:text-amber-300">
+            Instructions [I]
           </button>
-          <button id="btnOpenRubricModal" class="rounded-xl border border-amber-500/60 bg-amber-500/20 px-3 py-1.5 text-xs font-extrabold text-amber-300 shadow-lg transition hover:bg-amber-500/35">
-            ☕ AP CSA Rubric Stats
-          </button>
-        </div>
-
-        <div class="pointer-events-auto relative overflow-hidden rounded-2xl border-2 border-slate-700/90 bg-slate-950/90 shadow-2xl">
-          <canvas id="minimapCanvas" width="168" height="122" class="block cursor-default"></canvas>
-          <div class="pointer-events-none absolute bottom-1 left-2 text-[9px] font-bold uppercase tracking-wider text-slate-300/80">
-            Grand Line Radar
-          </div>
+          <button id="btnPauseGame" class="rounded-xl border border-slate-700 bg-slate-900/90 px-2.5 py-1.5 text-xs font-bold text-slate-300 shadow-lg transition hover:border-amber-400 hover:text-amber-300">Pause [P]</button>
         </div>
       </div>
     </div>
@@ -551,7 +541,6 @@
     <div id="bossHudBar" class="mx-auto hidden w-full max-w-xl rounded-2xl border-2 border-rose-500/70 bg-slate-950/90 px-4 py-2.5 shadow-2xl backdrop-blur-md">
       <div class="mb-1 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-lg">👑</span>
           <span class="font-display text-sm font-bold tracking-wider text-rose-400">IMU — SOVEREIGN OF THE EMPTY THRONE</span>
         </div>
         <span id="bossHpText" class="font-mono-code text-xs font-bold text-rose-200">2400 / 2400</span>
@@ -591,20 +580,20 @@
             <span class="mt-2 block bg-gradient-to-r from-amber-200 via-orange-400 to-rose-400 bg-clip-text text-transparent">ESCAPE</span>
           </h1>
           <p class="mt-5 max-w-lg text-sm leading-6 text-slate-300 sm:text-base">
-            Break through guarded island sectors, gather Log Poses, and reach the Empty Throne. Pirates are your main source of berries—fight smart, then spend carefully.
+            Break through guarded island sectors, gather Log Poses, and reach the Empty Throne. Pirates are your main source of berries. Fight smart, then spend carefully.
           </p>
 
           <div class="mt-7 grid grid-cols-3 gap-2">
             <div class="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.06] p-3">
-              <span class="block text-lg">⚔️</span>
+              <span class="block text-lg">FIGHT</span>
               <span class="mt-1 block text-[10px] font-bold uppercase tracking-wider text-cyan-200">Fight</span>
             </div>
             <div class="rounded-2xl border border-emerald-300/15 bg-emerald-300/[.06] p-3">
-              <span class="block text-lg">🧭</span>
+              <span class="block text-lg">EXPLORE</span>
               <span class="mt-1 block text-[10px] font-bold uppercase tracking-wider text-emerald-200">Explore</span>
             </div>
             <div class="rounded-2xl border border-rose-300/15 bg-rose-300/[.06] p-3">
-              <span class="block text-lg">👑</span>
+              <span class="block text-lg">ESCAPE</span>
               <span class="mt-1 block text-[10px] font-bold uppercase tracking-wider text-rose-200">Escape</span>
             </div>
           </div>
@@ -612,15 +601,13 @@
           <div class="mt-7 rounded-2xl border border-slate-600/50 bg-slate-950/45 p-4 sm:p-5">
             <div class="mb-3 flex items-center justify-between">
               <h2 class="font-display text-lg font-bold text-white">FIELD GUIDE</h2>
-              <span class="text-[10px] font-bold uppercase tracking-[.15em] text-slate-500">Quick start</span>
             </div>
-            <div class="grid gap-3 text-xs leading-5 text-slate-300 sm:grid-cols-2">
+            <div class="grid gap-3 text-s leading-5 text-slate-300 sm:grid-cols-2">
               <p><kbd class="keycap">W A S D</kbd> or arrows to move; point and <kbd class="keycap">Click</kbd> to attack.</p>
               <p><kbd class="keycap">E</kbd> near chests, gates, stations, and portals to interact.</p>
               <p><kbd class="keycap">Space</kbd> or <kbd class="keycap">Shift</kbd> to dash; <kbd class="keycap">R</kbd> reloads in 3 seconds.</p>
-              <p>Defeat pirates for berries and keys. Chests are rare and return after 40 seconds.</p>
+              <p><kbd class="keycap">B</kbd> spends one Log Pose to return to base; <kbd class="keycap">P</kbd> pauses and resumes.</p>
             </div>
-            <p class="mt-3 border-t border-slate-700/70 pt-3 text-[11px] leading-5 text-amber-100/80">Start with 0 berries. Defeated pirates leave berries and Log Poses on the ground; walk close to collect them. Pirates return after 3 minutes. Use the Armory and Forge with <kbd class="keycap">E</kbd>.</p>
           </div>
         </div>
       </section>
@@ -628,10 +615,9 @@
       <section class="border-t border-cyan-100/10 bg-slate-950/35 p-6 sm:p-9 md:border-l md:border-t-0 lg:p-11">
         <div class="mb-6 flex items-end justify-between gap-3">
           <div>
-            <p class="text-[10px] font-extrabold uppercase tracking-[.22em] text-cyan-300">Choose your challenge</p>
             <h2 class="mt-1 font-display text-3xl font-bold text-white">Set your course</h2>
           </div>
-          <span class="rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-1 text-[10px] font-bold text-rose-200">5 LEVELS</span>
+          <span class="rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-1 text-[10px] font-bold text-rose-200">4 LEVELS</span>
         </div>
 
         <div class="mb-5">
@@ -642,14 +628,15 @@
 
         <div class="mb-3 flex min-h-10 items-center justify-between gap-3">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Difficulty</span>
-          <span id="difficultyDescText" class="text-right text-xs font-semibold text-cyan-200">Balanced enemy pressure</span>
         </div>
         <div id="difficultyGrid" class="grid grid-cols-2 gap-2 sm:grid-cols-3"></div>
+        <p id="difficultyDescText" class="mt-2 text-right text-xs font-semibold text-cyan-200" aria-live="polite">
+          Balanced enemy pressure
+        </p>
 
         <button id="btnStartGame" class="mt-6 w-full rounded-xl bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 px-5 py-3.5 font-display text-lg font-extrabold tracking-wide text-slate-950 shadow-[0_10px_35px_rgba(251,146,60,.2)] transition hover:-translate-y-0.5 hover:brightness-110">
           BEGIN THE RAID <span class="ml-1">→</span>
         </button>
-        <p class="mt-3 text-center text-[10px] text-slate-500">Berries and Log Poses are picked up when you get close. Press E to open chests or use nearby stations.</p>
       </section>
     </div>
   </div>
@@ -659,13 +646,13 @@
       <div class="mb-4 flex items-center justify-between">
         <div>
           <span class="text-xs font-extrabold uppercase tracking-wider text-cyan-400">Safe Harbor Vending Station</span>
-          <h2 class="font-display text-2xl font-bold text-white">⚔️ GRAND LINE ARMORY</h2>
+          <h2 class="font-display text-2xl font-bold text-white">GRAND LINE ARMORY</h2>
         </div>
         <div class="flex items-center gap-3">
           <div class="rounded-xl bg-amber-500/20 px-3 py-1.5 font-display text-base font-bold text-amber-300">
           ● <span id="armoryBerriesDisplay">0</span>
           </div>
-          <button id="btnCloseArmory" class="rounded-xl bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300 hover:bg-slate-700">✕</button>
+          <button id="btnCloseArmory" class="rounded-xl bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300 hover:bg-slate-700">X</button>
         </div>
       </div>
       <div id="armoryItemsGrid" class="grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
@@ -676,30 +663,45 @@
     <div class="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-3xl border-2 border-purple-500/60 bg-slate-900 p-6 shadow-2xl">
       <div class="mb-4 flex items-center justify-between">
         <div>
-          <span class="text-xs font-extrabold uppercase tracking-wider text-purple-400">Haki &amp; Wapometal Upgrader</span>
-          <h2 class="font-display text-2xl font-bold text-white">🔨 RARITY FORGE</h2>
+          <span class="text-xs font-extrabold uppercase tracking-wider text-purple-400">Wapometal Upgrader</span>
+          <h2 class="font-display text-2xl font-bold text-white">RARITY FORGE</h2>
         </div>
         <div class="flex items-center gap-3">
           <div class="rounded-xl bg-amber-500/20 px-3 py-1.5 font-display text-base font-bold text-amber-300">
             ● <span id="forgeBerriesDisplay">0</span>
           </div>
-          <button id="btnCloseForge" class="rounded-xl bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300 hover:bg-slate-700">✕</button>
+          <button id="btnCloseForge" class="rounded-xl bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300 hover:bg-slate-700">X</button>
         </div>
       </div>
       <div id="forgeItemsGrid" class="grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
     </div>
   </div>
 
-  <div id="rubricModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
-    <div class="w-full max-w-2xl rounded-3xl border-2 border-amber-500/70 bg-slate-900 p-6 shadow-2xl">
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <span class="text-xs font-extrabold uppercase tracking-wider text-amber-400">Live Java Backend State &amp; Trackers</span>
-          <h2 class="font-display text-2xl font-bold text-white">☕ AP CSA UNITS 1 &amp; 2 RUBRIC TELEMETRY</h2>
-        </div>
-        <button id="btnCloseRubric" class="rounded-xl bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300 hover:bg-slate-700">✕</button>
+  <div id="pauseModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/85 p-4">
+    <div class="w-full max-w-md space-y-4 border border-slate-700 bg-slate-900 p-6">
+      <h2 class="text-2xl font-bold text-white">Paused</h2>
+      <p class="text-sm text-slate-300">Press P to resume or choose an option.</p>
+      <button id="btnResumeGame" class="w-full bg-amber-400 px-4 py-2.5 font-semibold text-slate-950">Resume</button>
+      <button id="btnPauseReturnHome" class="w-full bg-slate-700 px-4 py-2.5 font-semibold text-white">Return to home</button>
+    </div>
+  </div>
+
+  <div id="instructionsModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/85 p-4">
+    <div class="w-full max-w-lg space-y-4 border border-slate-700 bg-slate-900 p-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-bold text-white">Instructions</h2>
+        <button id="btnCloseInstructions" class="bg-slate-800 px-3 py-1.5 text-sm font-bold text-slate-300">Close</button>
       </div>
-      <div id="rubricStatsBody" class="space-y-3 text-xs text-slate-300"></div>
+      <ul class="space-y-2 text-sm leading-6 text-slate-300">
+        <li><strong>Move:</strong> W A S D or arrow keys.</li>
+        <li><strong>Aim and fire:</strong> move the mouse and hold the left mouse button.</li>
+        <li><strong>Interact:</strong> E near chests, gates, portals, the armory, forge, or ship.</li>
+        <li><strong>Return to base:</strong> B spends one Green Log Pose.</li>
+        <li><strong>Dash:</strong> Space or Shift costs 25 energy; weapons also consume energy.</li>
+        <li><strong>Reload / weapons:</strong> R reloads; number keys 1–5 select weapons.</li>
+        <li><strong>Pause / resume:</strong> P.</li>
+        <li>Collect Log Poses to open sector gates. Defeat IMU, return to the ship, and interact to escape.</li>
+      </ul>
     </div>
   </div>
 
@@ -727,11 +729,10 @@
       'use strict';
 
       const DIFFICULTIES = [
-        { name: 'Easy',      color: '#34d399', desc: 'Low enemy pressure' },
+        { name: 'Easy',      color: '#34d399', desc: 'Fewer, weaker enemies' },
         { name: 'Normal',    color: '#22d3ee', desc: 'Balanced enemy pressure' },
         { name: 'Hard',      color: '#a78bfa', desc: 'Strong, aggressive pirates' },
-        { name: 'Expert',    color: '#fb923c', desc: 'Severe enemy pressure' },
-        { name: 'Ludicrous', color: '#fb7185', desc: 'Near-impossible — for pros' }
+        { name: 'Expert',    color: '#fb923c', desc: 'Severe enemy pressure' }
       ];
 
       const RARITIES = [
@@ -746,9 +747,7 @@
         { id: 'sunny_ship',      type: 'SHIP',          name: 'Thousand Sunny (Escape Ship)',       x: 375,  y: 1300, radius: 58, color: '#f59e0b' },
         { id: 'armory_station',  type: 'ARMORY',        name: 'Armory Vending Machine',             x: 440,  y: 1550, radius: 36, color: '#c27a42' },
         { id: 'forge_station',   type: 'FORGE',         name: 'Rarity Forge Station',               x: 640,  y: 1550, radius: 36, color: '#a74433' },
-        { id: 'secret_pedestal', type: 'SECRET_WEAPON', name: "Conqueror's Haki Rod Pedestal",      x: 3120, y: 540,  radius: 32, color: '#eab308' },
-        { id: 'throne_portal',   type: 'THRONE_PORTAL', name: 'Empty Throne Portal (Final Boss)',   x: 5120, y: 1300, radius: 44, color: '#e11d48' },
-        { id: 'victory_portal',  type: 'VICTORY_WARP',  name: 'Warp to Thousand Sunny',             x: 1800, y: 3480, radius: 40, color: '#fbbf24' }
+        { id: 'secret_pedestal', type: 'GEAR5',         name: 'Gear 5 Energy Booster',               x: 3120, y: 540,  radius: 32, color: '#eab308' }
       ];
 
       const PALM_TREES = [
@@ -759,8 +758,6 @@
 
       const canvas = document.getElementById('gameCanvas');
       const ctx = canvas.getContext('2d');
-      const miniCanvas = document.getElementById('minimapCanvas');
-      const miniCtx = miniCanvas.getContext('2d');
       let viewportW = window.innerWidth;
       let viewportH = window.innerHeight;
       function resizeCanvas() {
@@ -785,14 +782,18 @@
       let latestEventId = 0;
       let pollingState = false;
       let sendingInput = false;
+      let sessionRevision = 0;
+      let startingGame = false;
 
       async function pollJavaState() {
-        if (pollingState) return;
+        if (pollingState || startingGame) return;
+        const requestRevision = sessionRevision;
         pollingState = true;
         try {
           const res = await fetch('/api/state');
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
+          if (requestRevision !== sessionRevision) return;
           document.getElementById('serverWarningBanner').classList.add('hidden');
           serverSnap = data;
           ingestServerEvents(data.events || []);
@@ -873,11 +874,12 @@
         document.getElementById('hudTimerText').textContent = formatTime(data.elapsedTime);
         document.getElementById('hudGreenKeysText').textContent = p.greenKeys;
         document.getElementById('hudGoldKeysText').textContent = `${p.goldKeys}/3`;
+        document.getElementById('gear5HudBadge').classList.toggle('hidden', !p.gear5Active);
         document.getElementById('hudZoneBadge').textContent = data.zoneLabel;
 
         const imu = (data.enemies || []).find(e => e.boss && e.hp > 0);
         const bossBar = document.getElementById('bossHudBar');
-        if (p.y > 2500 && imu) {
+        if (data.realm === 'IMU' && imu) {
           bossBar.classList.remove('hidden');
           document.getElementById('bossHpText').textContent = `${imu.hp} / ${imu.maxHp}`;
           document.getElementById('bossHpFill').style.width = `${Math.max(0, (imu.hp / imu.maxHp) * 100)}%`;
@@ -889,7 +891,19 @@
 
         renderHotbar(p);
 
-        if ((data.mode === 'VICTORY' || data.mode === 'DEFEAT') && !endShown) {
+        const homeVisible = !document.getElementById('startScreen').classList.contains('hidden');
+        const pauseModal = document.getElementById('pauseModal');
+        if (!homeVisible && data.mode === 'PAUSED' && activeModal !== 'INSTRUCTIONS') {
+          activeModal = 'PAUSE';
+          pauseModal.classList.remove('hidden');
+          pauseModal.classList.add('flex');
+        } else if (data.mode === 'PLAYING' && activeModal === 'PAUSE') {
+          activeModal = null;
+          pauseModal.classList.add('hidden');
+          pauseModal.classList.remove('flex');
+        }
+
+        if (!homeVisible && (data.mode === 'VICTORY' || data.mode === 'DEFEAT') && !endShown) {
           endShown = true;
           const win = data.mode === 'VICTORY';
           document.getElementById('endTitle').textContent = win ? 'Escaped!' : 'Defeated';
@@ -911,21 +925,17 @@
         const promptEl = document.getElementById('interactPrompt');
         const textEl = document.getElementById('interactPromptText');
 
-        for (const route of (data.portalRoutes || [])) {
-          const atDock = Math.hypot(p.x - route.dockX, p.y - route.dockY) <= 64;
-          const atDestination = Math.hypot(p.x - route.destinationX, p.y - route.destinationY) <= 64;
-          if (!atDock && !atDestination) continue;
-          promptEl.classList.remove('hidden');
-          promptEl.classList.add('flex');
-          textEl.textContent = route.unlocked
-            ? `Travel to ${atDock ? route.name : 'the docks'}`
-            : `Unlock ${route.name} portal · ${route.cost} berries`;
-          return;
+        for (const portal of (data.portals || [])) {
+          if (Math.hypot(p.x - portal.x, p.y - portal.y) <= 92) {
+            promptEl.classList.remove('hidden');
+            promptEl.classList.add('flex');
+            textEl.textContent = `Enter ${portal.name}`;
+            return;
+          }
         }
 
         for (const st of STATIONS) {
-          if (st.type === 'VICTORY_WARP' && !data.imuDefeated) continue;
-          if (st.type === 'SECRET_WEAPON' && data.secretWeaponClaimed) continue;
+          if (st.type === 'GEAR5' && data.gear5Unlocked) continue;
           if (Math.hypot(p.x - st.x, p.y - st.y) <= st.radius + 46) {
             promptEl.classList.remove('hidden');
             promptEl.classList.add('flex');
@@ -963,6 +973,7 @@
           btn.className = `flex min-w-[96px] sm:min-w-[118px] flex-col items-start rounded-xl border-2 px-2.5 py-1.5 text-left transition ${
             !w.unlocked ? 'border-slate-800 bg-slate-950/60 opacity-45' : sel ? 'scale-105 bg-slate-800 shadow-lg' : 'border-slate-700 bg-slate-900/90'
           }`;
+          btn.dataset.selected = String(sel);
           if (w.unlocked) btn.style.borderColor = sel ? w.rarityColor : `${w.rarityColor}66`;
           btn.innerHTML = `
             <div class="flex w-full items-center justify-between text-[10px] font-extrabold">
@@ -974,7 +985,7 @@
               <span class="truncate text-xs font-bold text-white">${w.name.split(' ')[0]}</span>
             </div>
             <div class="mt-0.5 font-mono-code text-[10px] text-slate-300">
-              ${!w.unlocked ? (w.cost < 0 ? 'Secret Vault' : `● ${w.cost} Armory`) : w.reloading ? 'Reloading...' : `${w.ammo} / ${w.clipSize}`}
+              ${!w.unlocked ? (w.cost < 0 ? 'Secret Vault' : `● ${w.cost} Armory`) : w.reloading ? 'Reloading...' : `${w.ammo} / ${w.clipSize} ammo`}
             </div>
           `;
           btn.onclick = () => sendActionToJava('SELECT_SLOT', idx);
@@ -1004,10 +1015,17 @@
               </div>
               <h4 class="mt-1 font-display text-base font-bold text-white">${w.name}</h4>
               <p class="mt-1 text-xs text-slate-400">${w.desc}</p>
+              <div class="mt-2 font-mono-code text-xs text-slate-300">
+                Damage: <strong class="text-white">${w.damage}</strong>
+                <span class="mx-1 text-slate-500">|</span>
+                Ammo limit: <strong class="text-white">${w.clipSize}</strong>
+                <span class="mx-1 text-slate-500">|</span>
+                Energy per shot: <strong class="text-white">${w.energyCost}</strong>
+              </div>
             </div>
             <div class="mt-3">
               ${w.unlocked
-                ? `<div class="w-full rounded-xl bg-emerald-500/20 py-2 text-center text-xs font-extrabold text-emerald-300">✓ OWNED</div>`
+                ? `<div class="w-full rounded-xl bg-emerald-500/20 py-2 text-center text-xs font-extrabold text-emerald-300">OWNED</div>`
                 : `<button data-idx="${idx}" class="w-full rounded-xl py-2 text-xs font-extrabold ${canAfford ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-500'}">BUY FOR ● ${w.cost}</button>`}
             </div>
           `;
@@ -1048,7 +1066,7 @@
             </div>
             <div class="mt-3">
               ${w.maxRarity
-                ? `<div class="w-full rounded-xl bg-amber-500/20 py-2 text-center text-xs font-extrabold text-amber-300">★ MAX LEGENDARY ★</div>`
+                ? `<div class="w-full rounded-xl bg-amber-500/20 py-2 text-center text-xs font-extrabold text-amber-300">MAX LEGENDARY</div>`
                 : `<button data-idx="${idx}" class="w-full rounded-xl py-2 text-xs font-extrabold ${canAfford ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-500'}">UPGRADE RARITY (● ${w.upgradeCost})</button>`}
             </div>
           `;
@@ -1063,54 +1081,47 @@
         });
       }
 
-      function openRubricModal() {
-        if (!serverSnap) return;
-        activeModal = 'RUBRIC';
-        const m = document.getElementById('rubricModal');
-        m.classList.remove('hidden'); m.classList.add('flex');
-        const p = serverSnap.player;
-        const met = serverSnap.metrics;
-        document.getElementById('rubricStatsBody').innerHTML = `
-          <div class="grid grid-cols-2 gap-2.5">
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
-              <div class="text-[10px] font-bold uppercase text-slate-400">Formatted Captain Callsign (String methods)</div>
-              <div class="mt-1 font-mono-code text-sm font-bold text-amber-300">${p.callsign}</div>
-            </div>
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
-              <div class="text-[10px] font-bold uppercase text-slate-400">Parsed Active Zone (indexOf &amp; substring)</div>
-              <div class="mt-1 font-mono-code text-sm font-bold text-cyan-300">${serverSnap.zoneLabel}</div>
-            </div>
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
-              <div class="text-[10px] font-bold uppercase text-slate-400">Min Tracker: Lowest HP Reached</div>
-              <div class="mt-1 font-mono-code text-sm font-bold text-rose-400">${met.lowestHpReached} HP</div>
-            </div>
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
-              <div class="text-[10px] font-bold uppercase text-slate-400">Max Tracker: Highest Single Hit</div>
-              <div class="mt-1 font-mono-code text-sm font-bold text-emerald-400">${met.highestSingleHit} DMG</div>
-            </div>
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
-              <div class="text-[10px] font-bold uppercase text-slate-400">Counter: Chests Opened / Pirates Defeated</div>
-              <div class="mt-1 font-mono-code text-sm font-bold text-white">${met.chestsOpened} Chests  |  ${met.kills} Kills</div>
-            </div>
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
-              <div class="text-[10px] font-bold uppercase text-slate-400">Accumulator: Total Berries Earned</div>
-              <div class="mt-1 font-mono-code text-sm font-bold text-amber-400">● ${met.totalBerriesEarned}</div>
-            </div>
-          </div>
-          <div class="rounded-xl border border-slate-800 bg-slate-950 p-3 leading-relaxed">
-            <strong class="text-emerald-400">Java Backend Architecture:</strong>
-            <code>Main</code>, <code>GameServer</code>, <code>GameEngine</code>, <code>Player</code>, <code>Weapon</code>, <code>PirateEnemy</code>, <code>RarityChest</code>, <code>SectorGate</code>, <code>WorldObstacle</code>, <code>LootDrop</code>, <code>Projectile</code>, <code>SkyLaser</code>, <code>BoundaryTestSuite</code>.
-          </div>
-        `;
-      }
-
       function closeModals() {
         activeModal = null;
-        ['armoryModal', 'forgeModal', 'rubricModal'].forEach(id => {
+        ['armoryModal', 'forgeModal', 'instructionsModal'].forEach(id => {
           const el = document.getElementById(id);
           el.classList.add('hidden');
           el.classList.remove('flex');
         });
+      }
+
+      function closeInstructions() {
+        document.getElementById('instructionsModal').classList.add('hidden');
+        document.getElementById('instructionsModal').classList.remove('flex');
+        activeModal = null;
+        sendActionToJava('RESUME');
+      }
+
+      function openInstructions() {
+        if (!serverSnap || serverSnap.mode !== 'PLAYING' || activeModal) return;
+        activeModal = 'INSTRUCTIONS';
+        const modal = document.getElementById('instructionsModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        sendActionToJava('PAUSE');
+      }
+
+      function returnToHome() {
+        sessionRevision++;
+        closeModals();
+        document.getElementById('pauseModal').classList.add('hidden');
+        document.getElementById('pauseModal').classList.remove('flex');
+        document.getElementById('endModal').classList.add('hidden');
+        document.getElementById('endModal').classList.remove('flex');
+        document.getElementById('hudLayer').classList.add('hidden');
+        document.getElementById('startScreen').classList.remove('hidden');
+        serverSnap = null;
+        endShown = false;
+        latestEventId = 0;
+        camX = 0;
+        camY = 0;
+        mouse.down = false;
+        Object.keys(keys).forEach(key => { keys[key] = false; });
       }
 
       function render(nowSec) {
@@ -1124,9 +1135,9 @@
         ctx.save();
         ctx.translate(-camX, -camY);
 
-        drawTerrain(p, nowSec);
+        drawTerrain(p, serverSnap.realm, nowSec);
+        drawPortals(nowSec);
         drawStations(nowSec);
-        drawPortalRoutes(nowSec);
         drawWallsAndGates();
         drawLootDrops(nowSec);
         drawChests(nowSec);
@@ -1136,27 +1147,36 @@
         drawPalmTrees(p);
         drawFloatingTexts();
 
-        if (serverSnap.showHitboxes) {
-          drawHitboxes(p);
-        }
         ctx.restore();
 
-        renderMinimap(p);
       }
 
-      function drawTerrain(p, nowSec) {
-        if (p.y > 2500) {
-          ctx.fillStyle = '#181313';
-          ctx.fillRect(900, 2400, 1800, 1500);
-          ctx.fillStyle = '#38221d';
-          ctx.fillRect(1200, 2700, 1200, 952);
-          ctx.fillStyle = '#71372b';
-          ctx.fillRect(1710, 2740, 180, 870);
-          ctx.strokeStyle = '#d7a45e'; ctx.lineWidth = 4;
-          ctx.strokeRect(1714, 2744, 172, 862);
-          ctx.fillStyle = '#b67c43';
-          ctx.fillRect(1720, 2755, 160, 75);
-          drawThroneFloorDetails();
+      function drawTerrain(p, realm, nowSec) {
+        if (realm === 'GOLD_KEY' || realm === 'IMU') {
+          ctx.fillStyle = '#159fe5';
+          ctx.fillRect(-12000, -12000, 24000, 24000);
+          const goldRealm = realm === 'GOLD_KEY';
+          const x = goldRealm ? 6500 : 8700;
+          const y = 600;
+          const width = goldRealm ? 1300 : 1900;
+          const height = goldRealm ? 1400 : 1600;
+          ctx.fillStyle = goldRealm ? '#56452b' : '#261b26';
+          ctx.fillRect(x + 40, y + 40, width - 80, height - 80);
+          ctx.strokeStyle = goldRealm ? '#e5b945' : '#c74754';
+          ctx.lineWidth = 8;
+          ctx.strokeRect(x + 44, y + 44, width - 88, height - 88);
+          ctx.strokeStyle = goldRealm ? 'rgba(255, 230, 150, .22)' : 'rgba(243, 89, 105, .22)';
+          ctx.lineWidth = 2;
+          for (let offset = 120; offset < width - 80; offset += 150) {
+            ctx.beginPath();
+            ctx.moveTo(x + offset, y + 70);
+            ctx.lineTo(x + offset, y + height - 70);
+            ctx.stroke();
+          }
+          ctx.fillStyle = goldRealm ? '#fff1a8' : '#ffc4c9';
+          ctx.font = '800 28px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(goldRealm ? 'GOLD KEY REALM' : 'EMPTY THRONE', x + width / 2, y + 100);
           return;
         }
 
@@ -1203,46 +1223,35 @@
         }
       }
 
-      function drawThroneFloorDetails() {
-        ctx.strokeStyle = 'rgba(218, 164, 111, .24)';
-        ctx.lineWidth = 2;
-        for (let y = 2790; y < 3590; y += 86) {
-          ctx.beginPath(); ctx.moveTo(1260, y); ctx.lineTo(2340, y); ctx.stroke();
+      function drawPortals(nowSec) {
+        for (const portal of (serverSnap.portals || [])) {
+          const pulse = 1 + Math.sin(nowSec * 4) * 0.1;
+          const color = portal.id.startsWith('gold') ? '#facc15' : '#f43f5e';
+          ctx.save();
+          ctx.translate(portal.x, portal.y);
+          ctx.rotate(nowSec * 0.35);
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 24;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 7;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 32 * pulse, 48 * pulse, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#fff7ed';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 13 * pulse, 25 * pulse, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '800 12px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(portal.name, portal.x, portal.y - 62);
         }
-      }
-
-      function drawPortalRoutes(nowSec) {
-        for (const route of (serverSnap.portalRoutes || [])) {
-          drawPortal(route.dockX, route.dockY, route, nowSec, true);
-          drawPortal(route.destinationX, route.destinationY, route, nowSec, false);
-        }
-      }
-
-      function drawPortal(x, y, route, nowSec, dockSide) {
-        const pulse = 1 + Math.sin(nowSec * 2.2 + x) * 0.05;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(nowSec * (route.unlocked ? 0.28 : 0.1));
-        ctx.strokeStyle = route.unlocked ? '#f0be5b' : '#896b4d';
-        ctx.lineWidth = 5;
-        ctx.beginPath(); ctx.ellipse(0, 0, 26 * pulse, 38 * pulse, 0, 0, Math.PI * 2); ctx.stroke();
-        ctx.strokeStyle = route.unlocked ? 'rgba(255, 215, 120, .5)' : 'rgba(191, 157, 119, .34)';
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.ellipse(0, 0, 17 * pulse, 28 * pulse, 0, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = route.unlocked ? 'rgba(230, 160, 61, .22)' : 'rgba(76, 57, 44, .7)';
-        ctx.beginPath(); ctx.ellipse(0, 0, 17, 28, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-        ctx.fillStyle = '#f5e8df';
-        ctx.font = '700 10px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(dockSide ? route.name : 'DOCK GATE', x, y - 48);
-        ctx.fillStyle = route.unlocked ? '#f2cc75' : '#d3b39a';
-        ctx.fillText(route.unlocked ? 'E · TRAVEL' : `E · ${route.cost} BERRIES`, x, y + 56);
       }
 
       function drawStations(nowSec) {
         for (const st of STATIONS) {
-          if (st.type === 'VICTORY_WARP' && !serverSnap.imuDefeated) continue;
           const pulse = 1 + Math.sin(nowSec * 4) * 0.08;
           ctx.beginPath();
           ctx.arc(st.x, st.y, st.radius * pulse, 0, Math.PI * 2);
@@ -1283,7 +1292,8 @@
           ctx.fillStyle = 'rgba(15, 23, 42, 0.32)';
           ctx.beginPath(); ctx.roundRect(w.x + 12, w.y + 14, w.w, w.h, 8); ctx.fill();
 
-          ctx.fillStyle = w.type === 'crate' ? '#b45309' : w.type === 'obsidian' ? '#0f172a' : '#475569';
+          ctx.fillStyle = w.type === 'cave' ? '#67503a'
+            : w.type === 'crate' ? '#b45309' : w.type === 'obsidian' ? '#0f172a' : '#475569';
           ctx.beginPath(); ctx.roundRect(w.x, w.y, w.w, w.h, 8); ctx.fill();
           if (w.type === 'crate') {
             ctx.strokeStyle = '#e2a04b'; ctx.lineWidth = 3;
@@ -1312,7 +1322,7 @@
           ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
           ctx.beginPath(); ctx.roundRect(cx - 56, cy - 20, 112, 40, 10); ctx.fill();
           ctx.fillStyle = '#ffffff'; ctx.font = '800 11px Inter, sans-serif'; ctx.textAlign = 'center';
-          ctx.fillText(g.reqGold > 0 ? `🔒 ${g.reqGold} GOLD KEYS` : `🔒 ${g.reqGreen} LOG POSES`, cx, cy + 4);
+          ctx.fillText(g.reqGold > 0 ? `LOCKED · ${g.reqGold} GOLD KEYS` : `LOCKED · ${g.reqGreen} LOG POSES`, cx, cy + 4);
         }
       }
 
@@ -1336,15 +1346,26 @@
         for (const drop of (serverSnap.lootDrops || [])) {
           const bob = Math.sin(nowSec * 3.5 + drop.bob) * 3;
           const berry = drop.type === 'BERRY';
-          ctx.fillStyle = berry ? 'rgba(255, 197, 78, 0.24)' : 'rgba(180, 83, 9, 0.25)';
+          const goldKey = drop.type === 'GOLD_KEY';
+          ctx.fillStyle = berry ? 'rgba(255, 197, 78, 0.24)'
+            : goldKey ? 'rgba(250, 204, 21, 0.32)' : 'rgba(180, 83, 9, 0.25)';
           ctx.beginPath(); ctx.ellipse(drop.x, drop.y + 7, 18, 9, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = berry ? '#e5a82f' : '#92400e';
+          ctx.fillStyle = berry ? '#e5a82f' : goldKey ? '#facc15' : '#92400e';
           ctx.beginPath(); ctx.arc(drop.x, drop.y + bob, berry ? 8 : 10, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = berry ? '#fff0b0' : '#d6a68c';
+          ctx.strokeStyle = berry ? '#fff0b0' : goldKey ? '#fff1a8' : '#d6a68c';
           ctx.lineWidth = 2; ctx.stroke();
           if (berry) {
             ctx.fillStyle = '#fff3c4';
             ctx.beginPath(); ctx.arc(drop.x - 2.5, drop.y - 2 + bob, 2.1, 0, Math.PI * 2); ctx.fill();
+          } else if (goldKey) {
+            ctx.strokeStyle = '#fff1a8';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(drop.x - 3, drop.y + bob, 3.5, 0, Math.PI * 2);
+            ctx.moveTo(drop.x, drop.y + bob);
+            ctx.lineTo(drop.x + 7, drop.y + bob + 6);
+            ctx.lineTo(drop.x + 10, drop.y + bob + 3);
+            ctx.stroke();
           } else {
             ctx.fillStyle = '#f5e8df';
             ctx.font = '700 9px Inter, sans-serif'; ctx.textAlign = 'center';
@@ -1367,6 +1388,12 @@
           drawPirateCharacter(en);
           ctx.restore();
 
+          if (en.type === 'gold_guardian') {
+            ctx.fillStyle = '#facc15';
+            ctx.font = '800 10px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('GOLD KEY GUARDIAN', en.x, en.y - en.radius - 19);
+          }
           if (en.hp < en.maxHp) {
             const bw = en.boss ? 84 : 42;
             ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
@@ -1458,12 +1485,23 @@
           ctx.closePath();
           ctx.fill();
         } else {
-          ctx.fillStyle = en.hitFlash ? '#fff1d8' : en.accent;
+          ctx.fillStyle = en.hitFlash ? '#fff1d8' : '#2c1a17';
           ctx.beginPath();
-          ctx.moveTo(-10, -12); ctx.quadraticCurveTo(0, -20, 10, -12);
-          ctx.lineTo(8, -9); ctx.lineTo(2, -11); ctx.lineTo(-4, -9); ctx.lineTo(-9, -10);
+          ctx.moveTo(-15, -13); ctx.quadraticCurveTo(-13, -20, -5, -20);
+          ctx.quadraticCurveTo(0, -25, 5, -20); ctx.quadraticCurveTo(13, -20, 15, -13);
+          ctx.lineTo(9, -10); ctx.quadraticCurveTo(0, -13, -9, -10);
           ctx.closePath();
           ctx.fill();
+          ctx.fillStyle = '#f2d8ab';
+          ctx.beginPath();
+          ctx.arc(0, -17, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#f2d8ab';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(-3.2, -19); ctx.lineTo(3.2, -15);
+          ctx.moveTo(3.2, -19); ctx.lineTo(-3.2, -15);
+          ctx.stroke();
         }
 
         ctx.strokeStyle = '#261211';
@@ -1625,43 +1663,45 @@
         ctx.strokeRect(-12, -19, 24, 3.5);
         ctx.restore();
 
-        ctx.save();
-        ctx.translate(p.x + 14, p.y + bobY + 8);
-        ctx.strokeStyle = '#641e1a';
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-7, -1); ctx.lineTo(1, 1);
-        ctx.stroke();
-        ctx.strokeStyle = '#d92f2c';
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.moveTo(-7, -1); ctx.lineTo(1, 1);
-        ctx.stroke();
-        ctx.fillStyle = '#edbd8e';
-        ctx.beginPath();
-        ctx.arc(2, 1, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#47251e';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.translate(2, 1);
-        ctx.rotate(p.aimAngle);
-        ctx.strokeStyle = '#55321f';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(0, 0); ctx.lineTo(13, 0);
-        ctx.stroke();
-        ctx.fillStyle = '#55321f';
-        ctx.beginPath();
-        ctx.roundRect(12, -2.5, 14, 5, 1.5);
-        ctx.fill();
-        ctx.fillStyle = '#b53a2b';
-        ctx.fillRect(15, -1.5, 8, 2);
-        ctx.fillStyle = '#d2a35a';
-        ctx.fillRect(12, -2, 2, 4);
-        ctx.fillRect(17, 2, 3, 5);
-        ctx.restore();
+        if (!(p.x >= 310 && p.x <= 790 && p.y >= 1000 && p.y <= 1600)) {
+          ctx.save();
+          ctx.translate(p.x + 14, p.y + bobY + 8);
+          ctx.strokeStyle = '#641e1a';
+          ctx.lineWidth = 8;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-7, -1); ctx.lineTo(1, 1);
+          ctx.stroke();
+          ctx.strokeStyle = '#d92f2c';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(-7, -1); ctx.lineTo(1, 1);
+          ctx.stroke();
+          ctx.fillStyle = '#edbd8e';
+          ctx.beginPath();
+          ctx.arc(2, 1, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#47251e';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.translate(2, 1);
+          ctx.rotate(p.aimAngle);
+          ctx.strokeStyle = '#55321f';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(0, 0); ctx.lineTo(13, 0);
+          ctx.stroke();
+          ctx.fillStyle = '#55321f';
+          ctx.beginPath();
+          ctx.roundRect(12, -2.5, 14, 5, 1.5);
+          ctx.fill();
+          ctx.fillStyle = '#b53a2b';
+          ctx.fillRect(15, -1.5, 8, 2);
+          ctx.fillStyle = '#d2a35a';
+          ctx.fillRect(12, -2, 2, 4);
+          ctx.fillRect(17, 2, 3, 5);
+          ctx.restore();
+        }
       }
 
       function drawProjectilesAndLasers() {
@@ -1683,7 +1723,7 @@
       }
 
       function drawPalmTrees(p) {
-        if (p.y > 2500) return;
+        if (serverSnap.realm !== 'MAIN') return;
         for (const [px, py, s] of PALM_TREES) {
           ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
           ctx.beginPath(); ctx.ellipse(px + 26 * s, py + 24 * s, 36 * s, 20 * s, 0.35, 0, Math.PI * 2); ctx.fill();
@@ -1711,37 +1751,6 @@
         }
       }
 
-      function drawHitboxes(p) {
-        ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.stroke();
-        ctx.strokeStyle = '#ef4444';
-        for (const en of (serverSnap.enemies || [])) {
-          if (en.hp > 0) { ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2); ctx.stroke(); }
-        }
-        ctx.strokeStyle = '#38bdf8';
-        for (const w of (serverSnap.walls || [])) ctx.strokeRect(w.x, w.y, w.w, w.h);
-      }
-
-      function renderMinimap(p) {
-        const mw = miniCanvas.width, mh = miniCanvas.height;
-        miniCtx.clearRect(0, 0, mw, mh);
-        const mapX = x => ((x - 260) / 5100) * mw;
-        const mapY = y => ((y - 420) / 1760) * mh;
-        miniCtx.fillStyle = '#159fe5'; miniCtx.fillRect(0, 0, mw, mh);
-        miniCtx.fillStyle = '#d4ae70'; miniCtx.fillRect(mapX(300), mapY(460), mapX(1740) - mapX(300), mapY(2140) - mapY(460));
-        miniCtx.fillStyle = '#96714e'; miniCtx.fillRect(mapX(1778), mapY(460), mapX(2690) - mapX(1778), mapY(2140) - mapY(460));
-        miniCtx.fillStyle = '#386c4b'; miniCtx.fillRect(mapX(2728), mapY(460), mapX(3590) - mapX(2728), mapY(2140) - mapY(460));
-        miniCtx.fillStyle = '#9b6245'; miniCtx.fillRect(mapX(3628), mapY(460), mapX(4540) - mapX(3628), mapY(2140) - mapY(460));
-        miniCtx.fillStyle = '#343b3c'; miniCtx.fillRect(mapX(4578), mapY(460), mapX(5360) - mapX(4578), mapY(2140) - mapY(460));
-        for (const route of (serverSnap.portalRoutes || [])) {
-          miniCtx.fillStyle = route.unlocked ? '#fff0a8' : '#c9a76b';
-          for (const point of [[route.dockX, route.dockY], [route.destinationX, route.destinationY]]) {
-            miniCtx.beginPath(); miniCtx.arc(mapX(point[0]), mapY(point[1]), 2.5, 0, Math.PI * 2); miniCtx.fill();
-          }
-        }
-        miniCtx.fillStyle = '#f7e7c7'; miniCtx.beginPath(); miniCtx.arc(mapX(p.x), mapY(p.y), 4, 0, Math.PI * 2); miniCtx.fill();
-      }
-
       function buildDifficultyUI() {
         const grid = document.getElementById('difficultyGrid');
         const desc = document.getElementById('difficultyDescText');
@@ -1752,6 +1761,7 @@
           btn.className = `level-choice rounded-xl px-3 py-3 text-left text-sm font-bold text-white ${active ? 'active' : ''}`;
           btn.style.borderColor = active ? d.color : '';
           btn.style.boxShadow = active ? `0 0 24px ${d.color}22` : '';
+          btn.setAttribute('aria-pressed', String(active));
           btn.textContent = d.name;
           btn.onclick = () => { selectedDiffIdx = idx; desc.textContent = d.desc; buildDifficultyUI(); };
           grid.appendChild(btn);
@@ -1760,7 +1770,18 @@
 
       window.addEventListener('keydown', e => {
         keys[e.code] = true;
+        if (e.code === 'Escape' && activeModal === 'INSTRUCTIONS') { closeInstructions(); return; }
         if (e.code === 'Escape' && activeModal) { closeModals(); return; }
+        if (e.code === 'KeyP' && serverSnap
+            && (serverSnap.mode === 'PLAYING' || serverSnap.mode === 'PAUSED')
+            && (!activeModal || activeModal === 'PAUSE')) {
+          sendActionToJava('PAUSE');
+          return;
+        }
+        if (e.code === 'KeyI' && serverSnap && serverSnap.mode === 'PLAYING' && !activeModal) {
+          openInstructions();
+          return;
+        }
         if (!serverSnap || serverSnap.mode !== 'PLAYING' || activeModal) return;
 
         if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
@@ -1772,8 +1793,8 @@
           sendActionToJava('INTERACT');
         } else if (e.code === 'KeyR') {
           sendActionToJava('RELOAD');
-        } else if (e.code === 'KeyH') {
-          sendActionToJava('TOGGLE_HITBOXES');
+        } else if (e.code === 'KeyB') {
+          sendActionToJava('RETURN_TO_BASE');
         } else if (e.code.startsWith('Digit')) {
           sendActionToJava('SELECT_SLOT', Number(e.code.replace('Digit', '')) - 1);
         }
@@ -1790,35 +1811,57 @@
       window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
 
       document.getElementById('btnStartGame').onclick = async () => {
+        if (startingGame) return;
         const diffName = DIFFICULTIES[selectedDiffIdx].name;
         const callsign = document.getElementById('inputCallsign').value;
+        startingGame = true;
+        sessionRevision++;
+        serverSnap = null;
         latestEventId = 0;
         endShown = false;
-        await fetch('/api/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ difficulty: diffName, callsign })
-        });
-        document.getElementById('startScreen').classList.add('hidden');
-        document.getElementById('hudLayer').classList.remove('hidden');
-        await pollJavaState();
-      };
-
-      document.getElementById('btnPlayAgain').onclick = () => {
+        camX = 0;
+        camY = 0;
         document.getElementById('endModal').classList.add('hidden');
         document.getElementById('endModal').classList.remove('flex');
-        closeModals();
-        document.getElementById('hudLayer').classList.add('hidden');
-        document.getElementById('startScreen').classList.remove('hidden');
-        mouse.down = false;
-        Object.keys(keys).forEach(key => { keys[key] = false; });
+        document.getElementById('pauseModal').classList.add('hidden');
+        document.getElementById('pauseModal').classList.remove('flex');
+        activeModal = null;
+        try {
+          const response = await fetch('/api/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ difficulty: diffName, callsign })
+          });
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          const newGame = await response.json();
+          if (newGame.mode !== 'PLAYING') {
+            throw new Error('The server did not start a new game');
+          }
+          serverSnap = newGame;
+          document.getElementById('serverWarningBanner').classList.add('hidden');
+          document.getElementById('startScreen').classList.add('hidden');
+          document.getElementById('hudLayer').classList.remove('hidden');
+          syncHudFromJava(serverSnap);
+        } catch (error) {
+          const banner = document.getElementById('serverWarningBanner');
+          banner.textContent = `Unable to start game: ${error.message}`;
+          banner.classList.remove('hidden');
+        } finally {
+          startingGame = false;
+        }
       };
 
-      document.getElementById('btnToggleHitboxes').onclick = () => sendActionToJava('TOGGLE_HITBOXES');
-      document.getElementById('btnOpenRubricModal').onclick = openRubricModal;
+      document.getElementById('btnPlayAgain').onclick = returnToHome;
+
+      document.getElementById('btnOpenInstructions').onclick = openInstructions;
+      document.getElementById('btnPauseGame').onclick = () => {
+        if (serverSnap && serverSnap.mode === 'PLAYING') sendActionToJava('PAUSE');
+      };
+      document.getElementById('btnResumeGame').onclick = () => sendActionToJava('RESUME');
+      document.getElementById('btnPauseReturnHome').onclick = returnToHome;
       document.getElementById('btnCloseArmory').onclick = closeModals;
       document.getElementById('btnCloseForge').onclick = closeModals;
-      document.getElementById('btnCloseRubric').onclick = closeModals;
+      document.getElementById('btnCloseInstructions').onclick = closeInstructions;
 
       buildDifficultyUI();
       setInterval(pollJavaState, 50);

@@ -5,7 +5,7 @@ public class BoundaryTestSuite {
     }
 
     public static void runAllTests() {
-        System.out.println("=== Running AP CSA Units 1 & 2 Boundary & Reliability Tests ===");
+        System.out.println("=== Running Boundary & Reliability Tests ===");
 
         Player testPlayer = new Player("StrawHatLuffyPirateKing:AdminHack", 500, 500);
         assertCondition(testPlayer.getCaptainCallsign().length() <= 18, "Callsign truncated via length() & substring()");
@@ -19,6 +19,65 @@ public class BoundaryTestSuite {
         assertCondition(energyPlayer.tryDash(1, 0), "Energy regeneration test consumes dash energy");
         energyPlayer.regeneratePassiveEnergy(1.0);
         assertCondition(energyPlayer.getEnergy() == 76.0, "Passive energy regenerates at one energy per second");
+        GameEngine weaponEnergyEngine = new GameEngine();
+        weaponEnergyEngine.resetGame("Normal", "Weapon Energy Test");
+        weaponEnergyEngine.getPlayer().setPosition(900, 1300);
+        double energyBeforeShot = weaponEnergyEngine.getPlayer().getEnergy();
+        assertCondition("FIRED".equals(weaponEnergyEngine.executePlayerAction("FIRE", 0))
+                && weaponEnergyEngine.getPlayer().getEnergy()
+                        == energyBeforeShot - Weapon.ENERGY_COST_PER_SHOT,
+                "Firing a weapon consumes energy");
+        assertCondition(weaponEnergyEngine.toJsonSnapshot().contains("\"energyCost\":1.0"),
+                "Weapon energy costs are included in the game snapshot");
+        GameEngine safeHarborWeaponEngine = new GameEngine();
+        safeHarborWeaponEngine.resetGame("Normal", "Safe Harbor Weapon Test");
+        Weapon harborWeapon = safeHarborWeaponEngine.getPlayer().getEquippedWeapon();
+        int harborAmmo = harborWeapon.getCurrentAmmo();
+        double harborEnergy = safeHarborWeaponEngine.getPlayer().getEnergy();
+        assertCondition("SAFE_HARBOR".equals(safeHarborWeaponEngine.executePlayerAction("FIRE", 0))
+                && harborWeapon.getCurrentAmmo() == harborAmmo
+                && safeHarborWeaponEngine.getPlayer().getEnergy() == harborEnergy,
+                "Weapons cannot be fired inside the safe harbor");
+        safeHarborWeaponEngine.updateInputState(false, false, false, false, true, 0);
+        safeHarborWeaponEngine.tick(1.0);
+        assertCondition(harborWeapon.getCurrentAmmo() == harborAmmo,
+                "Holding fire inside the safe harbor does not consume ammunition");
+        safeHarborWeaponEngine.getPlayer().setPosition(310, 1000);
+        assertCondition("SAFE_HARBOR".equals(safeHarborWeaponEngine.executePlayerAction("FIRE", 0)),
+                "The safe harbor covers the upper-left corner of the brown base");
+        safeHarborWeaponEngine.getPlayer().setPosition(790, 1600);
+        assertCondition("SAFE_HARBOR".equals(safeHarborWeaponEngine.executePlayerAction("FIRE", 0)),
+                "The safe harbor covers the lower-right corner of the brown base");
+        safeHarborWeaponEngine.getPlayer().setPosition(309, 1000);
+        assertCondition("FIRED".equals(safeHarborWeaponEngine.executePlayerAction("FIRE", 0)),
+                "The safe harbor boundary ends outside the brown base");
+        GameEngine pauseEngine = new GameEngine();
+        pauseEngine.resetGame("Normal", "Pause Test");
+        String pausedElapsedTime = pauseEngine.toJsonSnapshot().split("\"elapsedTime\":")[1].split(",")[0];
+        assertCondition("PAUSED".equals(pauseEngine.executePlayerAction("PAUSE", 0)),
+                "Pause action changes the game mode");
+        pauseEngine.tick(1.0);
+        assertCondition("PAUSED".equals(pauseEngine.getGameMode())
+                && pausedElapsedTime.equals(pauseEngine.toJsonSnapshot()
+                        .split("\"elapsedTime\":")[1].split(",")[0]),
+                "Paused games stop advancing");
+        assertCondition("RESUMED".equals(pauseEngine.executePlayerAction("PAUSE", 0)),
+                "Pause action resumes the game");
+        GameEngine replayEngine = new GameEngine();
+        replayEngine.resetGame("Normal", "Replay Test");
+        PirateEnemy replayBoss = replayEngine.getEnemies().stream()
+                .filter(PirateEnemy::isBoss).findFirst().orElseThrow();
+        replayBoss.takeDamage(replayBoss.getHp());
+        replayEngine.handleEnemyDefeated(replayBoss, 0.99);
+        replayEngine.getPlayer().setPosition(375, 1300);
+        assertCondition("VICTORY".equals(replayEngine.executePlayerAction("INTERACT", 0)),
+                "Winning a run reaches the victory state");
+        replayEngine.resetGame("Hard", "Replay Test");
+        assertCondition("PLAYING".equals(replayEngine.getGameMode())
+                && replayEngine.getPlayer().getHp() == replayEngine.getPlayer().getMaxHp()
+                && replayEngine.getPlayer().getBerries() == 0
+                && replayEngine.toJsonSnapshot().contains("\"elapsedTime\":0.00"),
+                "Starting after a victory creates a fresh playable run");
         assertCondition(GameEngine.shouldDropLogPose(0.0)
                 && GameEngine.shouldDropLogPose(0.4999)
                 && !GameEngine.shouldDropLogPose(0.50)
@@ -28,6 +87,8 @@ public class BoundaryTestSuite {
         sectionEngine.resetGame("Normal", "Section Count Test");
         assertCondition(hasExactSectionEnemyCounts(sectionEngine, 2),
                 "Every surface section has exactly twice its Log Pose requirement in enemies");
+        assertCondition(hasChestInEveryMapSection(sectionEngine),
+                "Chests spawn in the harbor, all five surface sections, and throne area");
         PirateEnemy[] firstSectionEnemies = sectionEngine.getEnemies().stream()
                 .filter(enemy -> !enemy.isBoss() && enemy.getX() < 1740)
                 .limit(3).toArray(PirateEnemy[]::new);
@@ -41,27 +102,112 @@ public class BoundaryTestSuite {
 
         GameEngine keyEngine = new GameEngine();
         keyEngine.resetGame("Normal", "Gold Key Test");
-        PirateEnemy finalKeyOpportunity = keyEngine.getEnemies().get(0);
-        keyEngine.getEnemies().clear();
-        finalKeyOpportunity.takeDamage(finalKeyOpportunity.getHp());
-        keyEngine.getEnemies().add(finalKeyOpportunity);
-        keyEngine.handleEnemyDefeated(finalKeyOpportunity, 0.99);
+        assertCondition(keyEngine.getEnemies().stream()
+                .filter(enemy -> !enemy.isBoss() && !"gold_guardian".equals(enemy.getType()))
+                .allMatch(enemy -> enemy.getGoldKeyDrop() == 0),
+                "Only Gold Key Guardians carry Gold Keys");
+        PirateEnemy ordinaryEnemy = keyEngine.getEnemies().stream()
+                .filter(enemy -> !enemy.isBoss() && !"gold_guardian".equals(enemy.getType()))
+                .findFirst().orElseThrow();
+        ordinaryEnemy.takeDamage(ordinaryEnemy.getHp());
+        keyEngine.handleEnemyDefeated(ordinaryEnemy, 0.99);
+        assertCondition(keyEngine.getPlayer().getGoldKeycards() == 0
+                && keyEngine.getLootDrops().stream().noneMatch(drop -> "GOLD_KEY".equals(drop.getType())),
+                "Regular enemies do not award Gold Keys");
+        PirateEnemy[] guardians = keyEngine.getEnemies().stream()
+                .filter(enemy -> "gold_guardian".equals(enemy.getType())).toArray(PirateEnemy[]::new);
+        assertCondition(guardians.length == 3
+                && java.util.Arrays.stream(guardians).allMatch(enemy ->
+                        enemy.getX() >= 6500 && enemy.getX() <= 7800
+                                && enemy.getGoldKeyDrop() == 1)
+                && java.util.Arrays.stream(guardians).allMatch(enemy ->
+                        enemy.getMaxHp() > ordinaryEnemy.getMaxHp()),
+                "Three harder, one-time Gold Key Guardians are isolated in their realm");
+        keyEngine.getPlayer().setPosition(2340, 1800);
+        assertCondition("PORTAL_TRAVELLED".equals(keyEngine.executePlayerAction("INTERACT", 0))
+                && "GOLD_KEY".equals(keyEngine.getCurrentRealm())
+                && keyEngine.toJsonSnapshot().contains("\"id\":\"gold_key_exit\"")
+                && keyEngine.getEnemies().stream().filter(enemy ->
+                        "gold_guardian".equals(enemy.getType())).allMatch(enemy -> enemy.getX() > 6500),
+                "The section 2 portal leads to an isolated Gold Key realm");
+        for (PirateEnemy guardian : guardians) {
+            guardian.takeDamage(guardian.getHp());
+            keyEngine.handleEnemyDefeated(guardian, 0.99);
+        }
+        assertCondition(keyEngine.getPlayer().getGoldKeycards() == 0
+                && keyEngine.getLootDrops().stream()
+                        .filter(drop -> "GOLD_KEY".equals(drop.getType())).count() == 3,
+                "Each Gold Key Guardian drops one physical Gold Key");
+        assertCondition(keyEngine.toJsonSnapshot().contains("\"type\":\"GOLD_KEY\""),
+                "Gold Key drops are represented in the game snapshot");
+        keyEngine.updateInputState(false, false, false, false, false, 0);
+        for (LootDrop drop : keyEngine.getLootDrops().toArray(new LootDrop[0])) {
+            if ("GOLD_KEY".equals(drop.getType())) {
+                keyEngine.getPlayer().setPosition(drop.getX(), drop.getY());
+                keyEngine.tick(1.0 / 60.0);
+            }
+        }
         assertCondition(keyEngine.getPlayer().getGoldKeycards() == 3,
-                "Remaining pirates guarantee enough Gold Keys to open the Secret Vault");
+                "Collecting the three realm drops grants the Gold Keys");
+        keyEngine.tick(GameEngine.ENEMY_RESPAWN_SECONDS);
+        assertCondition(keyEngine.getEnemies().stream()
+                .noneMatch(enemy -> "gold_guardian".equals(enemy.getType()) && enemy.isAlive()),
+                "Gold Key Guardians never respawn");
+        keyEngine.getPlayer().setPosition(7100, 1800);
+        assertCondition("PORTAL_TRAVELLED".equals(keyEngine.executePlayerAction("INTERACT", 0))
+                && "MAIN".equals(keyEngine.getCurrentRealm()),
+                "The Gold Key portal provides a return route to section 2");
         GameEngine lockedVaultEngine = new GameEngine();
         lockedVaultEngine.resetGame("Normal", "Locked Vault Test");
+        lockedVaultEngine.getChests().forEach(chest -> chest.markOpened(40.0));
         lockedVaultEngine.getPlayer().setPosition(3120, 540);
         assertCondition("GATE_LOCKED".equals(lockedVaultEngine.executePlayerAction("INTERACT", 0)),
                 "The Secret Vault cannot be opened without Gold Keys");
+        keyEngine.getChests().forEach(chest -> chest.markOpened(40.0));
         keyEngine.getPlayer().setPosition(3120, 540);
         assertCondition("GATE_UNLOCKED".equals(keyEngine.executePlayerAction("INTERACT", 0)),
                 "Three Gold Keys open the Secret Vault");
         keyEngine.getPlayer().setPosition(3120, 540);
         assertCondition("SECRET_CLAIMED".equals(keyEngine.executePlayerAction("INTERACT", 0))
-                && keyEngine.getPlayer().getWeapons().get(5).isUnlocked(),
-                "Opening the Gold Key vault unlocks Conqueror's Haki");
-        assertCondition(Weapon.UPGRADE_COSTS[0] == 45 && Weapon.UPGRADE_COSTS[3] == 280,
-                "Weapon rarity upgrades require substantial berry costs");
+                && keyEngine.getPlayer().hasGear5()
+                && keyEngine.getPlayer().getWeapons().size() == 5
+                && keyEngine.getPlayer().getMaxHp() == 150.0
+                && keyEngine.getPlayer().getDamageMultiplier() == 1.4
+                && keyEngine.toJsonSnapshot().contains("\"gear5Active\":true"),
+                "The Gold Key vault grants Gear 5 stats without adding a weapon");
+        keyEngine.getPlayer().consumeEnergy(10.0);
+        double gear5Energy = keyEngine.getPlayer().getEnergy();
+        keyEngine.getPlayer().regeneratePassiveEnergy(1.0);
+        assertCondition(keyEngine.getPlayer().getEnergy() == Math.min(
+                        keyEngine.getPlayer().getMaxEnergy(), gear5Energy + 2.0),
+                "Gear 5 regenerates two energy per second");
+        keyEngine.getPlayer().applyChestRewards(0, 0, 0, true);
+        assertCondition(keyEngine.getPlayer().getMaxHp() == 150.0,
+                "Legendary chests do not raise Gear 5 max health above 150");
+        GameEngine gearDamageEngine = new GameEngine();
+        gearDamageEngine.resetGame("Normal", "Gear 5 Damage Test");
+        gearDamageEngine.getPlayer().setPosition(900, 1300);
+        gearDamageEngine.getPlayer().setAimAngle(0.0);
+        int baseShotDamage = gearDamageEngine.getPlayer().getEquippedWeapon().getScaledDamage();
+        gearDamageEngine.getPlayer().activateGear5();
+        assertCondition("FIRED".equals(gearDamageEngine.executePlayerAction("FIRE", 0))
+                && gearDamageEngine.getProjectiles().get(0).getDamage()
+                        == (int) Math.round(baseShotDamage * 1.4),
+                "Gear 5 increases actual projectile damage by 40 percent");
+        GameEngine bossRewardEngine = new GameEngine();
+        bossRewardEngine.resetGame("Normal", "Boss Return Reward Test");
+        PirateEnemy finalBoss = bossRewardEngine.getEnemies().stream()
+                .filter(PirateEnemy::isBoss).findFirst().orElseThrow();
+        finalBoss.takeDamage(finalBoss.getHp());
+        bossRewardEngine.handleEnemyDefeated(finalBoss, 0.99);
+        assertCondition(bossRewardEngine.getLootDrops().stream()
+                .anyMatch(drop -> "LOG_POSE".equals(drop.getType())),
+                "The final boss guarantees a Log Pose to pay for the return trip");
+        assertCondition(Weapon.UPGRADE_COSTS[0] == 23 && Weapon.UPGRADE_COSTS[3] == 140,
+                "Weapon rarity upgrade prices are half their previous values");
+        assertCondition(new Player("Armory Cost Test", 0, 0).getWeapons().get(1).getUnlockCost() == 15
+                && new Player("Armory Cost Test", 0, 0).getWeapons().get(4).getUnlockCost() == 68,
+                "Armory prices start at 15 berries and are slightly cheaper");
         assertCondition(GameEngine.ENEMY_RESPAWN_SECONDS == 180.0, "Pirates respawn after three minutes");
         Player reloadPlayer = new Player("Reload Test", 0, 0);
         assertCondition(reloadPlayer.getWeapons().stream().allMatch(weapon ->
@@ -73,10 +219,16 @@ public class BoundaryTestSuite {
         assertCondition(reloadTestWeapon.isReloading(), "Reload stays active before three seconds");
         reloadTestWeapon.updateTimers(0.02);
         assertCondition(!reloadTestWeapon.isReloading(), "Reload completes at three seconds");
-        assertCondition(new RarityChest(0, 0, 4).getBerryReward() == 12,
-                "Even the rarest chest gives fewer berries than an elite pirate captain");
+        int chestBerryTotal = 0;
+        for (int rarity = 0; rarity < 5; rarity++) {
+            chestBerryTotal += new RarityChest(0, 0, rarity).getBerryReward();
+        }
+        assertCondition(chestBerryTotal == 30 && chestBerryTotal >= 26 * 1.15,
+                "Chest berries are about 15 percent higher than the previous total");
         PirateEnemy fallenPirate = new PirateEnemy(1, "test", "Test Pirate", 40, 50, 10,
                 20, 1, 1, 1, 10, 8, 0, 0, "#000000", "#ffffff", false, 1.0, 1.0);
+        assertCondition(fallenPirate.getBerryDrop() == 9,
+                "Pirate berry drops are about 15 percent higher");
         fallenPirate.takeDamage(20);
         PirateEnemy returnedPirate = fallenPirate.respawnAs(2);
         assertCondition(returnedPirate.isAlive() && returnedPirate.getHp() == returnedPirate.getMaxHp()
@@ -142,45 +294,60 @@ public class BoundaryTestSuite {
                 enemy.getId() == defeatedLootEnemy.getId()),
                 "Defeated enemies are removed from the active simulation");
 
-        GameEngine portalEngine = new GameEngine();
-        portalEngine.resetGame("Normal", "Portal Test");
-        assertCondition(portalEngine.getPortalRoutes().size() == 5,
-                "Each surface section has a dock portal route");
-        assertCondition(portalEngine.getPortalRoutes().stream().allMatch(route ->
-                Math.hypot(route.getDockX() - 375, route.getDockY() - 1300) <= 400),
-                "All surface portals are clustered at the ship's dock");
-        PortalRoute coralPortal = portalEngine.getPortalRoutes().get(0);
-        portalEngine.getPlayer().setPosition(coralPortal.getDockX(), coralPortal.getDockY());
-        assertCondition("PORTAL_CANNOT_AFFORD".equals(portalEngine.executePlayerAction("INTERACT", 0))
-                && !coralPortal.isUnlocked(), "Portal stays locked when the player cannot afford it");
-        portalEngine.getPlayer().addBerries(coralPortal.getBerryCost());
-        assertCondition("PORTAL_UNLOCKED".equals(portalEngine.executePlayerAction("INTERACT", 0))
-                && coralPortal.isUnlocked()
-                && portalEngine.getPlayer().getBerries() == 0,
-                "Portal purchase spends berries and unlocks it for the current game");
-        assertCondition("WARPED".equals(portalEngine.executePlayerAction("INTERACT", 0))
-                && portalEngine.getPlayer().getX() == coralPortal.getDestinationX(),
-                "Unlocked dock portal travels to its section");
-        assertCondition("WARPED".equals(portalEngine.executePlayerAction("INTERACT", 0))
-                && portalEngine.getPlayer().getX() == coralPortal.getDockX(),
-                "Section portal returns to the dock");
-        assertCondition(portalEngine.toJsonSnapshot().contains("\"portalRoutes\":["),
-                "Portal routes and unlock status are serialized");
-        portalEngine.resetGame("Normal", "Portal Reset Test");
-        assertCondition(!portalEngine.getPortalRoutes().get(0).isUnlocked(),
-                "Portal unlocks reset when a new game starts");
+        GameEngine returnEngine = new GameEngine();
+        returnEngine.resetGame("Normal", "Return to Base Test");
+        returnEngine.getPlayer().setPosition(2200, 1300);
+        assertCondition("NO_LOG_POSE".equals(returnEngine.executePlayerAction("RETURN_TO_BASE", 0))
+                && returnEngine.getPlayer().getX() == 2200,
+                "Returning to base requires a Log Pose");
+        returnEngine.getPlayer().addGreenLogPoses(1);
+        assertCondition("RETURNED_TO_BASE".equals(returnEngine.executePlayerAction("RETURN_TO_BASE", 0))
+                && returnEngine.getPlayer().getX() == 500
+                && returnEngine.getPlayer().getY() == 1300
+                && returnEngine.getPlayer().getGreenLogPoses() == 0,
+                "Returning to base spends one Log Pose");
+        GameEngine portalBossEngine = new GameEngine();
+        portalBossEngine.resetGame("Normal", "Boss Portal Test");
+        PirateEnemy portalBoss = portalBossEngine.getEnemies().stream()
+                .filter(PirateEnemy::isBoss).findFirst().orElseThrow();
+        assertCondition(portalBoss.getX() > 8700 && portalBoss.getY() < 2200,
+                "IMU is isolated in the Empty Throne realm");
+        portalBossEngine.getPlayer().setPosition(5140, 1300);
+        assertCondition("PORTAL_TRAVELLED".equals(portalBossEngine.executePlayerAction("INTERACT", 0))
+                && "IMU".equals(portalBossEngine.getCurrentRealm())
+                && portalBossEngine.toJsonSnapshot().contains("\"id\":\"imu_exit\"")
+                && portalBossEngine.toJsonSnapshot().contains("\"realm\":\"IMU\""),
+                "The section 5 portal leads to the isolated IMU realm");
+        portalBossEngine.getPlayer().setPosition(9600, 1900);
+        assertCondition("PORTAL_TRAVELLED".equals(portalBossEngine.executePlayerAction("INTERACT", 0))
+                && "MAIN".equals(portalBossEngine.getCurrentRealm())
+                && portalBossEngine.getPlayer().getX() == 5140,
+                "The IMU realm portal returns to section 5");
+        assertCondition(returnEngine.toJsonSnapshot().contains("\"portals\":[")
+                && returnEngine.toJsonSnapshot().contains("\"realm\":\"MAIN\""),
+                "Realm and portal state are included in the game snapshot");
 
-        GameEngine hardEngine = new GameEngine();
-        hardEngine.resetGame("Hard", "Difficulty Test");
-        GameEngine ludicrousEngine = new GameEngine();
-        ludicrousEngine.resetGame("Ludicrous", "Difficulty Test");
-        assertCondition(ludicrousEngine.getEnemies().get(0).getMaxHp()
-                > hardEngine.getEnemies().get(0).getMaxHp()
-                && ludicrousEngine.getEnemies().get(0).getDamage()
-                > hardEngine.getEnemies().get(0).getDamage(),
-                "Ludicrous enemies gain substantially more health and damage");
-        assertCondition(hasExactSectionEnemyCounts(ludicrousEngine, 5),
-                "Ludicrous section enemy counts scale with Log Pose requirements");
+        GameEngine harborEngine = new GameEngine();
+        harborEngine.resetGame("Normal", "Safe Harbor Test");
+        PirateEnemy harborEnemy = harborEngine.getEnemies().get(0);
+        harborEnemy.setPosition(540, 1300);
+        double harborHp = harborEngine.getPlayer().getHp();
+        for (int i = 0; i < 120; i++) {
+            harborEngine.tick(1.0 / 60.0);
+        }
+        assertCondition(harborEnemy.getX() == 540 && harborEnemy.getY() == 1300
+                && harborEngine.getPlayer().getHp() == harborHp,
+                "Enemies cannot approach or attack the player in base");
+
+        PirateEnemy normalFireRateEnemy = sectionEngine.getEnemies().stream()
+                .filter(enemy -> "Buggy Pirate".equals(enemy.getName())).findFirst().orElseThrow();
+        assertCondition(Math.abs(normalFireRateEnemy.getFireRate() - (1.65 / 1.25 / 0.70)) < 0.000001,
+                "Enemy firing frequency is reduced by 30 percent");
+        assertCondition(GameEngine.DIFFICULTY_NAMES.length == 4
+                && "Expert".equals(GameEngine.DIFFICULTY_NAMES[3])
+                && "Normal".equals(GameEngine.DIFFICULTY_NAMES[
+                        new GameEngine().resolveDifficultyIndex("Ludicrous")]),
+                "Ludicrous is removed and unavailable difficulty names fall back to Normal");
         GameEngine easyEngine = new GameEngine();
         easyEngine.resetGame("Easy", "Difficulty Test");
         GameEngine normalEngine = new GameEngine();
@@ -190,6 +357,26 @@ public class BoundaryTestSuite {
                 && easyEngine.getEnemies().get(0).getDamage()
                 < normalEngine.getEnemies().get(0).getDamage(),
                 "Easy difficulty reduces enemy health and damage");
+        for (int difficulty = 0; difficulty < GameEngine.DIFFICULTY_NAMES.length; difficulty++) {
+            GameEngine scaledEngine = new GameEngine();
+            scaledEngine.resetGame(GameEngine.DIFFICULTY_NAMES[difficulty], "Difficulty Test");
+            PirateEnemy surfaceEnemy = scaledEngine.getEnemies().stream()
+                    .filter(enemy -> "Buggy Pirate".equals(enemy.getName())).findFirst().orElseThrow();
+            PirateEnemy boss = scaledEngine.getEnemies().stream()
+                    .filter(PirateEnemy::isBoss).findFirst().orElseThrow();
+            int expectedSurfaceDamage = (int) Math.round(12 * GameEngine.DIFFICULTY_DMG_MULT[difficulty]);
+            int expectedBossDamage = (int) Math.round(34 * GameEngine.DIFFICULTY_DMG_MULT[difficulty]);
+            double[] previousDamageMultipliers = {0.40, 0.65, 1.20, 2.20};
+            assertCondition(GameEngine.DIFFICULTY_DMG_MULT[difficulty]
+                            == previousDamageMultipliers[difficulty] * 0.5
+                    && surfaceEnemy.getDamage() == expectedSurfaceDamage
+                    && boss.getDamage() == expectedBossDamage,
+                    GameEngine.DIFFICULTY_NAMES[difficulty]
+                            + " enemies and bosses deal 50% less damage");
+            assertCondition(hasExactSectionEnemyCounts(scaledEngine, difficulty + 1),
+                    GameEngine.DIFFICULTY_NAMES[difficulty]
+                            + " has " + ((difficulty + 1) * 2) + " enemies in each surface section");
+        }
 
         GameEngine chestEngine = new GameEngine();
         chestEngine.resetGame("Normal", "Test Captain");
@@ -199,10 +386,33 @@ public class BoundaryTestSuite {
         assertCondition(!nearbyChest.isOpened(), "Walking over a chest does not open it automatically");
         chestEngine.executePlayerAction("INTERACT", 0);
         assertCondition(nearbyChest.isOpened(), "Nearby chests open through the interact action");
+        assertCondition(chestEngine.getPlayer().getGoldKeycards() == 0,
+                "Chests do not award Gold Keys");
         nearbyChest.update(39.99);
         assertCondition(nearbyChest.isOpened(), "Opened chests stay closed for nearly 40 seconds");
         nearbyChest.update(0.02);
         assertCondition(!nearbyChest.isOpened(), "Opened chests return after 40 seconds");
+        int initialChestCount = chestEngine.getChests().size();
+        chestEngine.resetGame("Normal", "Second Chest Spawn Test");
+        assertCondition(chestEngine.getChests().size() == initialChestCount
+                && chestEngine.getChests().stream().allMatch(chest -> !chest.isOpened()),
+                "Chests spawn again after restarting a run");
+        chestEngine.resetGame("Expert", "Game Over Chest Spawn Test");
+        chestEngine.getPlayer().setPosition(1300, 1100);
+        PirateEnemy gameOverEnemy = chestEngine.getEnemies().get(0);
+        gameOverEnemy.setPosition(1340, 1100);
+        gameOverEnemy.tickTimers(5.0);
+        for (int i = 0; i < 600 && "PLAYING".equals(chestEngine.getGameMode()); i++) {
+            chestEngine.tick(1.0 / 60.0);
+        }
+        assertCondition("DEFEAT".equals(chestEngine.getGameMode()),
+                "Test run reaches game over before restarting");
+        chestEngine.resetGame("Normal", "Post Game Over Chest Spawn Test");
+        assertCondition(chestEngine.getChests().size() == initialChestCount,
+                "Chests spawn after game over");
+        chestEngine.resetGame("Normal", "Third Chest Spawn Test");
+        assertCondition(chestEngine.getChests().size() == initialChestCount,
+                "Chest spawning remains reliable on a second restart");
 
         assertCondition(!testPlayer.buyWeapon(4), "Purchase rejected when berries < cost");
 
@@ -221,7 +431,7 @@ public class BoundaryTestSuite {
         GameEngine engine = new GameEngine();
         assertCondition("Normal".equals(GameEngine.DIFFICULTY_NAMES[
                 engine.resolveDifficultyIndex("InvalidMode")]), "Unknown difficulty defaults to Normal");
-        assertCondition(GameEngine.DIFFICULTY_NAMES.length == 5, "Only five difficulty levels are available");
+        assertCondition(GameEngine.DIFFICULTY_NAMES.length == 4, "Only four difficulty levels are available");
 
         System.out.println("=== All Boundary & Reliability Assertions PASSED! ===");
     }
@@ -236,18 +446,39 @@ public class BoundaryTestSuite {
     private static boolean hasExactSectionEnemyCounts(GameEngine engine, int gateRequirement) {
         int[] sectionMinX = {260, 1778, 2728, 3628, 4578};
         int[] sectionMaxX = {1740, 2690, 3590, 4540, 5360};
-        int[] extraLogPoseRequirements = {0, 0, 1, 1, 2};
         for (int i = 0; i < sectionMinX.length; i++) {
             final int sectionStart = sectionMinX[i];
             final int sectionEnd = sectionMaxX[i];
             long enemiesInSection = engine.getEnemies().stream()
                     .filter(enemy -> !enemy.isBoss()
+                            && enemy.getY() < 2140
                             && enemy.getX() >= sectionStart && enemy.getX() < sectionEnd)
                     .count();
-            if (enemiesInSection != 2L * (gateRequirement + extraLogPoseRequirements[i])) {
+            if (enemiesInSection != 2L * gateRequirement) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean hasChestInEveryMapSection(GameEngine engine) {
+        int[] sectionMinX = {260, 1778, 2728, 3628, 4578};
+        int[] sectionMaxX = {1740, 2690, 3590, 4540, 5360};
+        for (int i = 0; i < sectionMinX.length; i++) {
+            final int sectionStart = sectionMinX[i];
+            final int sectionEnd = sectionMaxX[i];
+            boolean hasChest = engine.getChests().stream().anyMatch(chest ->
+                    chest.getY() >= 460 && chest.getY() <= 2140
+                            && chest.getX() >= sectionStart && chest.getX() < sectionEnd);
+            if (!hasChest) {
+                return false;
+            }
+        }
+        boolean hasHarborChest = engine.getChests().stream().anyMatch(chest ->
+                chest.getX() <= 800 && chest.getY() >= 1120 && chest.getY() <= 1680);
+        boolean hasThroneChest = engine.getChests().stream().anyMatch(chest ->
+                chest.getX() >= 8700 && chest.getX() < 10600
+                        && chest.getY() >= 600 && chest.getY() < 2200);
+        return hasHarborChest && hasThroneChest;
     }
 }
