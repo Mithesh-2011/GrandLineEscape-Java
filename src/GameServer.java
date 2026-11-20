@@ -10,47 +10,118 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class GameServer {
+    private static final long SESSION_LIFETIME_MILLIS = TimeUnit.HOURS.toMillis(6);
+
     private final int port;
-    private final GameEngine engine;
+    private final ConcurrentMap<String, GameSession> sessions = new ConcurrentHashMap<>();
     private HttpServer server;
     private ScheduledExecutorService ticker;
+    private ScheduledExecutorService sessionCleaner;
+    private ExecutorService requestExecutor;
 
-    public GameServer(int port, GameEngine engine) {
+    public GameServer(int port) {
         this.port = port;
-        this.engine = engine;
     }
 
     public void start() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(port), 0);
+        server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
 
         server.createContext("/", new StaticHtmlHandler());
 
+        server.createContext("/health", new HealthHandler());
         server.createContext("/api/state", new StateHandler());
         server.createContext("/api/start", new StartHandler());
         server.createContext("/api/input", new InputHandler());
         server.createContext("/api/action", new ActionHandler());
 
-        server.setExecutor(Executors.newCachedThreadPool());
+        requestExecutor = Executors.newFixedThreadPool(16);
+        server.setExecutor(requestExecutor);
         server.start();
 
         ticker = Executors.newSingleThreadScheduledExecutor();
         ticker.scheduleAtFixedRate(() -> {
-            try {
-                engine.tick(1.0 / 60.0);
-            } catch (Exception ex) {
-                ex.printStackTrace();
+            for (GameSession session : sessions.values()) {
+                try {
+                    session.engine.tick(1.0 / 60.0);
+                } catch (RuntimeException ex) {
+                    System.err.println("Game session tick failed: " + ex.getMessage());
+                    ex.printStackTrace();
+                }
             }
         }, 0, 16, TimeUnit.MILLISECONDS);
+
+        sessionCleaner = Executors.newSingleThreadScheduledExecutor();
+        sessionCleaner.scheduleAtFixedRate(this::removeExpiredSessions, 5, 5, TimeUnit.MINUTES);
+    }
+
+    public void stop() {
+        if (server != null) {
+            server.stop(1);
+        }
+        if (ticker != null) {
+            ticker.shutdownNow();
+        }
+        if (sessionCleaner != null) {
+            sessionCleaner.shutdownNow();
+        }
+        if (requestExecutor != null) {
+            requestExecutor.shutdown();
+        }
+    }
+
+    private void removeExpiredSessions() {
+        long cutoff = System.currentTimeMillis() - SESSION_LIFETIME_MILLIS;
+        sessions.entrySet().removeIf(entry -> entry.getValue().createdAtMillis < cutoff);
+    }
+
+    private GameEngine getSessionEngine(HttpExchange exchange) {
+        String sessionId = readSessionCookie(exchange);
+        GameSession session = sessionId == null ? null : sessions.get(sessionId);
+        if (session != null) {
+            return session.engine;
+        }
+
+        String newSessionId = UUID.randomUUID().toString();
+        session = new GameSession(new GameEngine());
+        sessions.put(newSessionId, session);
+        String forwardedProto = exchange.getRequestHeaders().getFirst("X-Forwarded-Proto");
+        boolean secure = forwardedProto != null && forwardedProto.split(",", 2)[0].trim().equalsIgnoreCase("https");
+        String cookie = "GAME_SESSION=" + newSessionId + "; Path=/; Max-Age="
+                + TimeUnit.MILLISECONDS.toSeconds(SESSION_LIFETIME_MILLIS) + "; HttpOnly; SameSite=Lax";
+        exchange.getResponseHeaders().add("Set-Cookie", secure ? cookie + "; Secure" : cookie);
+        return session.engine;
+    }
+
+    private String readSessionCookie(HttpExchange exchange) {
+        for (String header : exchange.getRequestHeaders().getOrDefault("Cookie", java.util.Collections.emptyList())) {
+            for (String cookie : header.split(";")) {
+                String[] parts = cookie.trim().split("=", 2);
+                if (parts.length == 2 && "GAME_SESSION".equals(parts[0])
+                        && parts[1].matches("[0-9a-fA-F-]{36}")) {
+                    return parts[1];
+                }
+            }
+        }
+        return null;
     }
 
     private class StaticHtmlHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equals(exchange.getRequestMethod())) {
+                sendJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+                return;
+            }
+            getSessionEngine(exchange);
             File htmlFile = new File("web/index.html");
             if (!htmlFile.exists()) {
                 htmlFile = new File("../web/index.html");
@@ -65,6 +136,7 @@ public class GameServer {
             }
             byte[] bytes = readAllBytes(htmlFile);
             exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache");
             exchange.sendResponseHeaders(200, bytes.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(bytes);
@@ -72,19 +144,39 @@ public class GameServer {
         }
     }
 
+    private class HealthHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equals(exchange.getRequestMethod())) {
+                sendJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+                return;
+            }
+            sendJson(exchange, 200, "{\"status\":\"ok\"}");
+        }
+    }
+
     private class StateHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            sendJson(exchange, 200, engine.toJsonSnapshot());
+            if (!"GET".equals(exchange.getRequestMethod())) {
+                sendJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+                return;
+            }
+            sendJson(exchange, 200, getSessionEngine(exchange).toJsonSnapshot());
         }
     }
 
     private class StartHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equals(exchange.getRequestMethod())) {
+                sendJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+                return;
+            }
             String body = readBody(exchange);
             String difficulty = extractJsonString(body, "difficulty", "Normal");
             String callsign = extractJsonString(body, "callsign", "Monkey D. Luffy");
+            GameEngine engine = getSessionEngine(exchange);
             engine.resetGame(difficulty, callsign);
             sendJson(exchange, 200, engine.toJsonSnapshot());
         }
@@ -93,6 +185,10 @@ public class GameServer {
     private class InputHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equals(exchange.getRequestMethod())) {
+                sendJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+                return;
+            }
             String body = readBody(exchange);
             boolean up = extractJsonBoolean(body, "up");
             boolean down = extractJsonBoolean(body, "down");
@@ -100,6 +196,7 @@ public class GameServer {
             boolean right = extractJsonBoolean(body, "right");
             boolean firing = extractJsonBoolean(body, "firing");
             double aimAngle = extractJsonDouble(body, "aimAngle", 0.0);
+            GameEngine engine = getSessionEngine(exchange);
             engine.updateInputState(up, down, left, right, firing, aimAngle);
             sendJson(exchange, 200, "{\"ok\":true}");
         }
@@ -108,9 +205,14 @@ public class GameServer {
     private class ActionHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equals(exchange.getRequestMethod())) {
+                sendJson(exchange, 405, "{\"error\":\"Method not allowed\"}");
+                return;
+            }
             String body = readBody(exchange);
             String action = extractJsonString(body, "action", "");
             int param = (int) Math.round(extractJsonDouble(body, "param", 0.0));
+            GameEngine engine = getSessionEngine(exchange);
             String result = engine.executePlayerAction(action, param);
             sendJson(exchange, 200, "{\"result\":\"" + result + "\"}");
         }
@@ -187,6 +289,16 @@ public class GameServer {
         exchange.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);
+        }
+    }
+
+    private static class GameSession {
+        private final GameEngine engine;
+        private final long createdAtMillis;
+
+        private GameSession(GameEngine engine) {
+            this.engine = engine;
+            this.createdAtMillis = System.currentTimeMillis();
         }
     }
 }

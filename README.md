@@ -1,57 +1,51 @@
-# Grand Line Escape — Java Backend Architecture
+# Grand Line Escape
 
-A top-down action escape game themed around **One Piece**, engineered with an authoritative **13-class Java Object-Oriented Backend** (`com.sun.net.httpserver.HttpServer` + 60 Hz simulation engine) and a **60 FPS Browser Canvas Client**.
+A top-down action game with a Java 11+ backend and browser-based Canvas client.
 
----
+## Run locally
 
-## Complete Architecture (`src/` + `web/`)
+Requirements: JDK 11 or newer.
 
-```text
-GrandLine-JavaBackend/
-├── src/
-│   ├── Main.java               # Entry point: runs boundary tests, starts server & opens browser
-│   ├── GameServer.java         # Built-in Java HttpServer (port 8080) & REST JSON API
-│   ├── GameEngine.java         # 60 Hz simulation engine, world builder, collisions & JSON serializer
-│   ├── Player.java             # Monkey D. Luffy class (HP, Energy, Dash, Weapons, String methods)
-│   ├── Weapon.java             # 6 weapons with Common -> Legendary rarity upgrades
-│   ├── PirateEnemy.java        # Villain pirates & multi-phase Final Boss IMU
-│   ├── RarityChest.java        # Weighted Math.random() chests replacing trivia questions for HP/Energy
-│   ├── SectorGate.java         # Progression barriers unlocked with Green Log Poses & Gold Keycards
-│   ├── WorldObstacle.java      # Solid walls/rocks/pillars with Circle-vs-AABB sliding collision math
-│   ├── LootDrop.java           # Physical berry and Log Pose pickups
-│   ├── Projectile.java         # Active projectiles with piercing support
-│   ├── SkyLaser.java           # Stage 3 Buster Call & Imu Mother Flame orbital sky-beams
-│   └── BoundaryTestSuite.java  # Automated gameplay boundary and input-validation tests
-├── web/
-│   └── index.html              # 60 FPS browser renderer, illustrated level-selection screen and HUD
-├── run.bat                     # One-click Windows compile & launch script
-├── run.sh                      # One-click macOS / Linux compile & launch script
-└── README.md                   # Architecture & gameplay guide
+Run the provided script:
+
+```bash
+./run.sh
 ```
 
----
+On Windows, double-click `run.bat`.
 
-## How to Run (Zero External JARs Required!)
+Or compile and start manually:
 
-### Option A: One-Click Scripts
-- **Windows:** Double-click **`run.bat`**.
-- **macOS / Linux:** Open Terminal inside the extracted folder and run:
-  ```bash
-  chmod +x run.sh
-  ./run.sh
-  ```
-
-### Option B: Manual Terminal Commands
 ```bash
 mkdir -p out
-javac -d out src/*.java
+javac --release 11 -d out src/*.java
 java -cp out Main
 ```
-Once started, open **`http://localhost:8080`** in your browser (it opens automatically on most desktops).
 
----
+Open <http://localhost:8080>. On desktop systems the launcher opens the browser automatically. Set `PORT` to change the listening port or `OPEN_BROWSER=false` to disable browser launching.
 
-## How to Play
+## Publish online
+
+The app needs a Java server; it cannot be hosted as a static-only site. A Docker image and Render Blueprint are included:
+
+1. Push this repository to GitHub.
+2. In Render, choose **New → Blueprint**, connect the repository, and deploy the detected `render.yaml`.
+3. Wait for the service health check to pass, then share its public URL.
+
+You can also build and run the container on any Docker-compatible host:
+
+```bash
+docker build -t grand-line-escape .
+docker run --rm -p 8080:8080 grand-line-escape
+```
+
+The service listens on `0.0.0.0` and uses the host-provided `PORT`. `/health` is available for platform health checks. HTTPS termination should be provided by the hosting platform or reverse proxy.
+
+Each browser gets a separate, anonymous game session. Sessions are held in memory for up to six hours; they are not saved and will be lost on a server restart. Run one server instance unless session storage is added for multi-instance deployments.
+
+**Before public release:** this game uses One Piece names and characters. Confirm you have the rights needed to publish it, or replace those elements with original content; hosting it does not grant those rights.
+
+## How to play
 
 1. Choose Easy, Normal, Hard, or Expert and a captain name on the home screen, then select **Start game**. Easy uses weaker enemies; each difficulty has 2, 4, 6, or 8 enemies in each surface section.
 2. You start with **0 berries**. Defeated pirates leave berry pickups and have a **50% chance** to drop a Log Pose; move close to collect either item. Berry rewards are about **15% higher** than before.
