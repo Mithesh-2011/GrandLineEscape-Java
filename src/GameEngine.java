@@ -1085,6 +1085,27 @@ public class GameEngine {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
+    private void appendFixed(StringBuilder sb, double value, int precision) {
+        long scale = 1;
+        for (int i = 0; i < precision; i++) {
+            scale *= 10;
+        }
+        long rounded = Math.round(Math.abs(value) * scale);
+        if (Double.doubleToRawLongBits(value) < 0) {
+            sb.append("-");
+        }
+        sb.append(rounded / scale);
+        if (precision > 0) {
+            sb.append(".");
+            long fraction = rounded % scale;
+            long divisor = scale / 10;
+            while (divisor > 0) {
+                sb.append((fraction / divisor) % 10);
+                divisor /= 10;
+            }
+        }
+    }
+
     public synchronized String toJsonSnapshot() {
         StringBuilder sb = new StringBuilder(8192);
         sb.append("{");
@@ -1093,7 +1114,9 @@ public class GameEngine {
         sb.append("\"difficultyIndex\":").append(difficultyIndex).append(",");
         sb.append("\"realm\":\"").append(currentRealm).append("\",");
         sb.append("\"gateReq\":").append(DIFFICULTY_GATE_REQ[difficultyIndex]).append(",");
-        sb.append("\"elapsedTime\":").append(String.format(java.util.Locale.US, "%.2f", elapsedTime)).append(",");
+        sb.append("\"elapsedTime\":");
+        appendFixed(sb, elapsedTime, 2);
+        sb.append(",");
         sb.append("\"zoneLabel\":\"").append(escapeJson(getCurrentZoneSummary())).append("\",");
         sb.append("\"imuDefeated\":").append(imuDefeated).append(",");
         sb.append("\"secretVaultUnlocked\":").append(secretVaultUnlocked).append(",");
@@ -1106,8 +1129,11 @@ public class GameEngine {
 
         sb.append("\"player\":{");
         sb.append("\"callsign\":\"").append(escapeJson(player.getCaptainCallsign())).append("\",");
-        sb.append("\"x\":").append(String.format(java.util.Locale.US, "%.1f", player.getX())).append(",");
-        sb.append("\"y\":").append(String.format(java.util.Locale.US, "%.1f", player.getY())).append(",");
+        sb.append("\"x\":");
+        appendFixed(sb, player.getX(), 1);
+        sb.append(",\"y\":");
+        appendFixed(sb, player.getY(), 1);
+        sb.append(",");
         sb.append("\"radius\":").append(player.getRadius()).append(",");
         sb.append("\"hp\":").append(Math.ceil(player.getHp())).append(",");
         sb.append("\"maxHp\":").append(Math.round(player.getMaxHp())).append(",");
@@ -1117,8 +1143,11 @@ public class GameEngine {
         sb.append("\"greenKeys\":").append(player.getGreenLogPoses()).append(",");
         sb.append("\"goldKeys\":").append(player.getGoldKeycards()).append(",");
         sb.append("\"gear5Active\":").append(player.hasGear5()).append(",");
-        sb.append("\"aimAngle\":").append(String.format(java.util.Locale.US, "%.3f", player.getAimAngle())).append(",");
-        sb.append("\"walkBob\":").append(String.format(java.util.Locale.US, "%.2f", player.getWalkBob())).append(",");
+        sb.append("\"aimAngle\":");
+        appendFixed(sb, player.getAimAngle(), 3);
+        sb.append(",\"walkBob\":");
+        appendFixed(sb, player.getWalkBob(), 2);
+        sb.append(",");
         sb.append("\"dashing\":").append(player.isDashing()).append(",");
         sb.append("\"equippedIndex\":").append(player.getEquippedWeaponIndex()).append(",");
         sb.append("\"weapons\":[");
@@ -1191,7 +1220,9 @@ public class GameEngine {
             sb.append("{\"x\":").append(Math.round(c.getX())).append(",\"y\":").append(Math.round(c.getY()))
               .append(",\"rarityIndex\":").append(c.getRarityIndex())
               .append(",\"opened\":").append(c.isOpened())
-              .append(",\"bob\":").append(String.format(java.util.Locale.US, "%.2f", c.getBobPhase())).append("}");
+              .append(",\"bob\":");
+            appendFixed(sb, c.getBobPhase(), 2);
+            sb.append("}");
         }
         sb.append("],");
 
@@ -1199,11 +1230,13 @@ public class GameEngine {
         for (int i = 0; i < lootDrops.size(); i++) {
             LootDrop drop = lootDrops.get(i);
             if (i > 0) sb.append(",");
-            sb.append("{\"type\":\"").append(drop.getType()).append("\",\"x\":")
-              .append(String.format(java.util.Locale.US, "%.1f", drop.getX()))
-              .append(",\"y\":").append(String.format(java.util.Locale.US, "%.1f", drop.getY()))
-              .append(",\"amount\":").append(drop.getAmount())
-              .append(",\"bob\":").append(String.format(java.util.Locale.US, "%.2f", drop.getBobPhase())).append("}");
+            sb.append("{\"type\":\"").append(drop.getType()).append("\",\"x\":");
+            appendFixed(sb, drop.getX(), 1);
+            sb.append(",\"y\":");
+            appendFixed(sb, drop.getY(), 1);
+            sb.append(",\"amount\":").append(drop.getAmount()).append(",\"bob\":");
+            appendFixed(sb, drop.getBobPhase(), 2);
+            sb.append("}");
         }
         sb.append("],");
 
@@ -1213,14 +1246,18 @@ public class GameEngine {
             if (i > 0) sb.append(",");
             sb.append("{\"id\":").append(e.getId()).append(",\"type\":\"").append(e.getType())
               .append("\",\"name\":\"").append(escapeJson(e.getName()))
-              .append("\",\"x\":").append(String.format(java.util.Locale.US, "%.1f", e.getX()))
-              .append(",\"y\":").append(String.format(java.util.Locale.US, "%.1f", e.getY()))
-              .append(",\"radius\":").append(e.getRadius())
+              .append("\",\"x\":");
+            appendFixed(sb, e.getX(), 1);
+            sb.append(",\"y\":");
+            appendFixed(sb, e.getY(), 1);
+            sb.append(",\"radius\":").append(e.getRadius())
               .append(",\"hp\":").append(e.getHp()).append(",\"maxHp\":").append(e.getMaxHp())
               .append(",\"color\":\"").append(e.getPrimaryColor()).append("\",\"accent\":\"").append(e.getAccentColor())
               .append("\",\"boss\":").append(e.isBoss())
               .append(",\"hitFlash\":").append(e.getHitFlashTimer() > 0)
-              .append(",\"aimAngle\":").append(String.format(java.util.Locale.US, "%.2f", e.getAimAngle())).append("}");
+              .append(",\"aimAngle\":");
+            appendFixed(sb, e.getAimAngle(), 2);
+            sb.append("}");
         }
         sb.append("],");
 
@@ -1228,9 +1265,11 @@ public class GameEngine {
         for (int i = 0; i < projectiles.size(); i++) {
             Projectile p = projectiles.get(i);
             if (i > 0) sb.append(",");
-            sb.append("{\"x\":").append(String.format(java.util.Locale.US, "%.1f", p.getX()))
-              .append(",\"y\":").append(String.format(java.util.Locale.US, "%.1f", p.getY()))
-              .append(",\"radius\":").append(p.getRadius())
+            sb.append("{\"x\":");
+            appendFixed(sb, p.getX(), 1);
+            sb.append(",\"y\":");
+            appendFixed(sb, p.getY(), 1);
+            sb.append(",\"radius\":").append(p.getRadius())
               .append(",\"color\":\"").append(p.getColor())
               .append("\",\"rarityColor\":\"").append(p.getRarityColor()).append("\"}");
         }

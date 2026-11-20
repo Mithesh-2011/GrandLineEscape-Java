@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPOutputStream;
 
 public class GameServer {
     private static final long SESSION_LIFETIME_MILLIS = TimeUnit.HOURS.toMillis(6);
@@ -284,12 +285,49 @@ public class GameServer {
 
     private void sendJson(HttpExchange exchange, int status, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+        if (acceptsGzip(exchange)) {
+            ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(compressed)) {
+                gzip.write(bytes);
+            }
+            bytes = compressed.toByteArray();
+            exchange.getResponseHeaders().set("Content-Encoding", "gzip");
+        }
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
         exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.getResponseHeaders().set("Vary", "Accept-Encoding");
         exchange.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);
         }
+    }
+
+    private boolean acceptsGzip(HttpExchange exchange) {
+        String acceptEncoding = exchange.getRequestHeaders().getFirst("Accept-Encoding");
+        if (acceptEncoding == null) {
+            return false;
+        }
+        for (String encoding : acceptEncoding.split(",")) {
+            String[] parts = encoding.trim().split(";", 2);
+            if (!"gzip".equalsIgnoreCase(parts[0].trim())) {
+                continue;
+            }
+            if (parts.length == 1) {
+                return true;
+            }
+            for (String parameter : parts[1].split(";")) {
+                String[] setting = parameter.trim().split("=", 2);
+                if (setting.length == 2 && "q".equalsIgnoreCase(setting[0].trim())) {
+                    try {
+                        return Double.parseDouble(setting[1].trim()) > 0.0;
+                    } catch (NumberFormatException e) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     private static class GameSession {

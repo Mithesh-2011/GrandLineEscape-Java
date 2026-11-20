@@ -29,6 +29,13 @@ public class BoundaryTestSuite {
                 "Firing a weapon consumes energy");
         assertCondition(weaponEnergyEngine.toJsonSnapshot().contains("\"energyCost\":1.0"),
                 "Weapon energy costs are included in the game snapshot");
+        String initialSnapshot = weaponEnergyEngine.toJsonSnapshot();
+        assertCondition(initialSnapshot.contains("\"elapsedTime\":0.00"),
+                "Snapshots preserve elapsed-time decimal precision");
+        assertCondition(initialSnapshot.contains("\"x\":900.0,\"y\":1300.0"),
+                "Snapshots preserve position decimal precision");
+        assertCondition(initialSnapshot.contains("\"aimAngle\":0.000"),
+                "Snapshots preserve aim-angle decimal precision");
         GameEngine safeHarborWeaponEngine = new GameEngine();
         safeHarborWeaponEngine.resetGame("Normal", "Safe Harbor Weapon Test");
         Weapon harborWeapon = safeHarborWeaponEngine.getPlayer().getEquippedWeapon();
