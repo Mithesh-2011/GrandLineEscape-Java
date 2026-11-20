@@ -538,14 +538,14 @@
       </div>
     </div>
 
-    <div id="bossHudBar" class="mx-auto hidden w-full max-w-xl rounded-2xl border-2 border-rose-500/70 bg-slate-950/90 px-4 py-2.5 shadow-2xl backdrop-blur-md">
-      <div class="mb-1 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="font-display text-sm font-bold tracking-wider text-rose-400">IMU — SOVEREIGN OF THE EMPTY THRONE</span>
+    <div id="bossHudBar" class="absolute right-3 top-20 hidden w-[min(22rem,calc(100vw_-_1.5rem))] rounded-2xl border-2 border-rose-500/70 bg-slate-950/90 px-3 py-1.5 shadow-2xl backdrop-blur-md">
+      <div class="mb-1 flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <span class="block truncate font-display text-xs font-bold tracking-wide text-rose-400">IMU — SOVEREIGN OF THE EMPTY THRONE</span>
         </div>
-        <span id="bossHpText" class="font-mono-code text-xs font-bold text-rose-200">2400 / 2400</span>
+        <span id="bossHpText" class="shrink-0 font-mono-code text-[10px] font-bold text-rose-200">2400 / 2400</span>
       </div>
-      <div class="h-3.5 w-full overflow-hidden rounded-full bg-slate-900 p-0.5 ring-1 ring-rose-500/50">
+      <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-900 p-0.5 ring-1 ring-rose-500/50">
         <div id="bossHpFill" class="h-full rounded-full bg-gradient-to-r from-purple-600 via-rose-600 to-amber-400 transition-all duration-100" style="width: 100%"></div>
       </div>
     </div>
