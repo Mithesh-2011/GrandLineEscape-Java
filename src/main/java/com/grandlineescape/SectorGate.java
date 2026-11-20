@@ -1,3 +1,5 @@
+package com.grandlineescape;
+
 public class SectorGate {
     private final String id;
     private final String name;

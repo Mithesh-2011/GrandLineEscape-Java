@@ -1,10 +1,10 @@
 # Grand Line Escape
 
-A top-down action game with a Java 11+ backend and browser-based Canvas client.
+A top-down action game with a Spring Boot backend and browser-based Canvas client.
 
 ## Run locally
 
-Requirements: JDK 11 or newer.
+Requirements: JDK 17 or newer and Maven 3.8+.
 
 Run the provided script:
 
@@ -14,19 +14,23 @@ Run the provided script:
 
 On Windows, double-click `run.bat`.
 
-Or compile and start manually:
+Or run it directly with Maven:
 
 ```bash
-mkdir -p out
-javac --release 11 -d out src/*.java
-java -cp out Main
+mvn spring-boot:run
 ```
 
-Open <http://localhost:8080>. On desktop systems the launcher opens the browser automatically. Set `PORT` to change the listening port or `OPEN_BROWSER=false` to disable browser launching.
+Open <http://localhost:8080>. On desktop systems the launcher opens the browser automatically. Set `PORT` to change the listening port or `OPEN_BROWSER=false` to disable browser launching. The REST API is served by Spring MVC, and Spring's embedded Tomcat handles HTTP, JSON, compression, and health requests.
+
+Run the test suite with:
+
+```bash
+mvn test
+```
 
 ## Publish online
 
-The app needs a Java server; it cannot be hosted as a static-only site. A Docker image and Render Blueprint are included:
+The app needs a Java server; it cannot be hosted as a static-only site. A Spring Boot executable JAR, Docker image, and Render Blueprint are included:
 
 1. Push this repository to GitHub.
 2. In Render, choose **New → Blueprint**, connect the repository, and deploy the detected `render.yaml`.

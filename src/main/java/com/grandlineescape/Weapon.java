@@ -1,3 +1,5 @@
+package com.grandlineescape;
+
 public class Weapon {
     public static final double ENERGY_COST_PER_SHOT = 1.0;
     public static final String[] RARITY_NAMES = {"Common", "Uncommon", "Rare", "Epic", "Legendary"};

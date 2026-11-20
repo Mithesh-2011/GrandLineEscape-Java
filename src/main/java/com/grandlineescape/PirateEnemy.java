@@ -1,3 +1,5 @@
+package com.grandlineescape;
+
 public class PirateEnemy {
     private final int id;
     private final String type;

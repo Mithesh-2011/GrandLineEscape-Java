@@ -1,4 +1,13 @@
-public class BoundaryTestSuite {
+package com.grandlineescape;
+
+import org.junit.jupiter.api.Test;
+
+public class BoundaryTest {
+
+    @Test
+    public void boundaryAndReliabilityTests() {
+        runAllTests();
+    }
 
     public static void main(String[] args) {
         runAllTests();

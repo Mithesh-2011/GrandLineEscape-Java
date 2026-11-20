@@ -1,3 +1,5 @@
+package com.grandlineescape;
+
 public class WorldObstacle {
     private final double x;
     private final double y;

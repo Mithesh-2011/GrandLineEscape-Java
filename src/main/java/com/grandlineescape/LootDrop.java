@@ -1,3 +1,5 @@
+package com.grandlineescape;
+
 public class LootDrop {
     private final String type;
     private final double x;

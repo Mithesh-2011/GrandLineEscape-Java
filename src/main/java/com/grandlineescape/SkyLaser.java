@@ -1,3 +1,5 @@
+package com.grandlineescape;
+
 public class SkyLaser {
     private final double x1;
     private final double y1;

@@ -1,3 +1,5 @@
+package com.grandlineescape;
+
 public class RarityChest {
     private final double x;
     private final double y;
